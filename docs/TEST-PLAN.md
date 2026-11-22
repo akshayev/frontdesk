@@ -23,8 +23,9 @@ All tests run with `uv run pytest`. Integration tests use real PostgreSQL 16 (do
 | U-16 | Pause when already overdue | old due kept |
 | U-17 | Badge at_risk threshold 25% | at_risk |
 | U-18 | Badge late / met / paused | correct state |
-| U-19 | 5 working days auto-close boundary | closes after, not before |
-| U-20 | 7 calendar days reopen boundary | allowed at 6d23h, refused at 7d+1s |
+| U-19 | 5 working days auto-close boundary | closes at exactly 2700 working min and after, not before (D-025 `>=`) |
+| U-20 | 7 calendar days reopen boundary | allowed at 6d23h, refused at exactly 7d (D-025) and at 7d+1s |
+| U-21 | Paused when already overdue (D-025) | badge late; overdue minutes frozen at pause (30 at pause → still 30 after 2 working days paused) |
 
 ## Integration (`tests/integration/`)
 | ID | Case | Expected |

@@ -81,6 +81,13 @@ Targets (working min): urgent 120/540 · medium 270/1620 · low 540/2700. Calend
 ## D-024 · S1 · One formula for downgrade and paused priority changes
 - Downgrade and paused priority changes use one formula: `remaining_new = new_target − (old_target − remaining_now)`; `due = now + remaining_new` (if not paused). Equivalent to "created_at + new_target excluding paused time" with no extra column.
 
+## D-025 · S1 · SLA badge semantics and window boundaries (approved by owner during S1)
+- **Late is sticky.** `badge()`: once any target is missed, badge = `late` with target = the missed one and minutes = how late; if both were missed, show resolution. Otherwise the response target is shown until it is met, then resolution. Matches SLA-7 and keeps the "Late" view consistent with the badge.
+- **SLA panel shows both targets.** The ticket detail SLA panel (UI-4) shows response and resolution separately (due, met_at, state), so agents still see the resolution countdown on a late ticket (`policy.target_statuses()`).
+- **Late wins over paused, overdue minutes freeze.** A `waiting_on_customer` ticket whose resolution was already overdue at pause (WAIT-3 breach preserved) shows `late`, with minutes = `working_minutes_between(resolution_due_at, paused_at)` — frozen at the pause, not counted up to now, because customer waiting time is not Arvo's fault (Meera, Section 3). The list row still shows status "Waiting on customer" separately. Test U-21.
+- **Boundary convention: a window ends AT the boundary (>=).** Auto-close (WAIT-4) when `working_minutes_between(paused_at, now) >= 2700`. Reopen (RO-1/RO-2) allowed only while `now − resolved_at < 7 days`; the sweep (RO-3) closes when `now − resolved_at >= 7 days`. The exact 7-day instant belongs to "expired". U-19, U-20.
+- Rejected: badge follows only the currently shown target (Late view would disagree with the badge); paused always wins (hides a real breach); overdue minutes keep growing while paused (blames the team for customer silence); `>` boundaries (two conventions in one system).
+
 ---
 
 ## Incident → design map (interview)
