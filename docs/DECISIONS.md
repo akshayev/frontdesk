@@ -80,6 +80,7 @@ Targets (working min): urgent 120/540 · medium 270/1620 · low 540/2700. Calend
 
 ## D-024 · S1 · One formula for downgrade and paused priority changes
 - Downgrade and paused priority changes use one formula: `remaining_new = new_target − (old_target − remaining_now)`; `due = now + remaining_new` (if not paused). Equivalent to "created_at + new_target excluding paused time" with no extra column.
+- Computed as old_due + (new_target − old_target) working minutes (same value, avoids an 18:30/09:30 edge).
 
 ## D-025 · S1 · SLA badge semantics and window boundaries (approved by owner during S1)
 - **Late is sticky.** `badge()`: once any target is missed, badge = `late` with target = the missed one and minutes = how late; if both were missed, show resolution. Otherwise the response target is shown until it is met, then resolution. Matches SLA-7 and keeps the "Late" view consistent with the badge.
@@ -87,6 +88,21 @@ Targets (working min): urgent 120/540 · medium 270/1620 · low 540/2700. Calend
 - **Late wins over paused, overdue minutes freeze.** A `waiting_on_customer` ticket whose resolution was already overdue at pause (WAIT-3 breach preserved) shows `late`, with minutes = `working_minutes_between(resolution_due_at, paused_at)` — frozen at the pause, not counted up to now, because customer waiting time is not Arvo's fault (Meera, Section 3). The list row still shows status "Waiting on customer" separately. Test U-21.
 - **Boundary convention: a window ends AT the boundary (>=).** Auto-close (WAIT-4) when `working_minutes_between(paused_at, now) >= 2700`. Reopen (RO-1/RO-2) allowed only while `now − resolved_at < 7 days`; the sweep (RO-3) closes when `now − resolved_at >= 7 days`. The exact 7-day instant belongs to "expired". U-19, U-20.
 - Rejected: badge follows only the currently shown target (Late view would disagree with the badge); paused always wins (hides a real breach); overdue minutes keep growing while paused (blames the team for customer silence); `>` boundaries (two conventions in one system).
+
+## D-026 · S2 · Resume and reopen exclude waiting/resolved time for every ticket (approved by owner, Sprint 2)
+- On resume (customer reply to waiting) and on reopen, due = add_working_minutes(old_due, working_minutes_between(paused_at or resolved_at, now)). Customer-waiting and resolved time are excluded for breached tickets too; for on-time tickets this equals now + remaining. Supersedes the 'keep old due when remaining = 0' part of WAIT-3.
+- Implemented in `policy.resume()`. `resolution_remaining_min` is kept only for the paused badge and PRI-4 (`change_priority` while paused); a priority change while paused moves the preserved due by the same delta, so resume still lands on now + new remaining.
+- Why: with "keep old due", a ticket 30 min late at pause became late by 30 min + the whole waiting time on resume — blaming the team for customer silence, contradicting D-025's frozen overdue minutes.
+- Rejected: keep old due (above); reset the clock on resume (hides a real breach).
+
+## D-027 · S2 · Resolve requires a met first response (approved by owner, Sprint 2)
+- Resolve requires a met first response (at least one public agent reply); otherwise 409 reply_required.
+- Noted in PRD SLA-6; enforced in the domain layer in Sprint 3.
+- Why: resolving without ever answering the customer would leave the response target unmet forever on a closed-out ticket and makes "met" meaningless.
+
+## D-028 · S2 · httpx2 not added
+- httpx2 not added — unverified package taken from a warning text (typosquatting risk). The single StarletteDeprecationWarning is filtered by exact message in pytest config.
+- Why: CLAUDE.md requires approval for new dependencies; a package name suggested only by a runtime warning is not a trustworthy source.
 
 ---
 

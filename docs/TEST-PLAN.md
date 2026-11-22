@@ -20,7 +20,7 @@ All tests run with `uv run pytest`. Integration tests use real PostgreSQL 16 (do
 | U-13 | Upgrade when response already met | response unchanged |
 | U-14 | Priority change while paused | remaining adjusted per PRI-4 |
 | U-15 | Pause/resume preserves remaining minutes | due shifted correctly |
-| U-16 | Pause when already overdue | old due kept |
+| U-16 | Pause when already overdue | old due kept while paused; on resume due shifts by the waiting time (D-026: late 30 at pause → 2 working days → resume → +60 → late 90) |
 | U-17 | Badge at_risk threshold 25% | at_risk |
 | U-18 | Badge late / met / paused | correct state |
 | U-19 | 5 working days auto-close boundary | closes at exactly 2700 working min and after, not before (D-025 `>=`) |

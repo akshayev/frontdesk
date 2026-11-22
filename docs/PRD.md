@@ -19,7 +19,7 @@ Every rule below cites where in the story it came from. Rules marked **[DECISION
 | SLA-3 | Working time = 09:30–18:30 Asia/Kolkata, Monday–Friday, excluding dates in the `holidays` table. |
 | SLA-4 | Acceptance: urgent ticket created Fri 18:00 IST → first response due **Mon 11:00 IST** (30 min Fri + 90 min Mon). It must not show as late on Sat/Sun. |
 | SLA-5 | First response is met by the first **public agent reply**. Internal notes never count. |
-| SLA-6 | Resolution is met when the ticket moves to `resolved`. |
+| SLA-6 | Resolution is met when the ticket moves to `resolved`. Resolve requires a met first response (at least one public agent reply), else 409 `reply_required` [D-027]. |
 | SLA-7 | A ticket is **late** if a target was met after its due time, or is unmet and now > due time. |
 | SLA-8 | **At risk** = unmet and less than 25% of the target's working minutes remain. |
 
@@ -28,13 +28,13 @@ Every rule below cites where in the story it came from. Rules marked **[DECISION
 |---|---|
 | WAIT-1 | Status `waiting_on_customer` pauses the resolution clock. |
 | WAIT-2 | It can only be entered together with a public agent reply (the question being asked). |
-| WAIT-3 | On pause store remaining working minutes; on customer reply: status → `open`, resolution due = now + remaining working minutes. If already overdue at pause, the old due time is kept (breach preserved). |
+| WAIT-3 | On pause store remaining working minutes; on customer reply: status → `open`, resolution due = old due + working minutes spent waiting [D-026] (equals now + remaining for an on-time ticket). If already overdue at pause, the breach is preserved: the ticket stays late by the amount it was late at the pause. |
 | WAIT-4 | If the customer does not reply for **5 working days** [D-010], the system closes the ticket (`closed`, reason `no_customer_reply`). |
 
 ## 4. Resolve, reopen, close (Section 3, paragraph 5)
 | ID | Rule |
 |---|---|
-| RO-1 | Customer may reopen a `resolved` ticket within **7 calendar days** of `resolved_at` [D-011]. Status → `open`. Resolution clock resumes with the remaining working minutes at resolve time [D-013]. |
+| RO-1 | Customer may reopen a `resolved` ticket within **7 calendar days** of `resolved_at` [D-011]. Status → `open`. Resolution clock resumes with the remaining working minutes at resolve time [D-013]: due = old due + working minutes spent resolved [D-026]. |
 | RO-2 | A customer reply to a resolved ticket inside the window also reopens it. |
 | RO-3 | After 7 calendar days the system closes it (`closed`, reason `reopen_window_expired`). |
 | RO-4 | Customer writes to a closed ticket → a **new ticket** is created with `parent_ticket_id` = old ticket [D-012]. |

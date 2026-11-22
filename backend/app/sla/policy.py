@@ -1,15 +1,17 @@
 """Targets, priority-change rules, badge computation. Implements: SLA-1, SLA-2, SLA-5, SLA-6,
-SLA-7, SLA-8, WAIT-1, WAIT-3, WAIT-4, RO-1, RO-3, PRI-1, PRI-2, PRI-3, PRI-4; D-024, D-025.
+SLA-7, SLA-8, WAIT-1, WAIT-3, WAIT-4, RO-1, RO-3, PRI-1, PRI-2, PRI-3, PRI-4; D-024, D-025,
+D-026.
 
 Pure module: no FastAPI, no SQLAlchemy, no clock (test A-2). The caller always passes `now`
 (the request's DB time, ARCHITECTURE §6) and the holiday set.
 
 Clock invariants (mirrors the ticket columns of the same names):
 - running:  paused_at is None, resolved_at is None, resolution_remaining_min is None.
-- paused:   paused_at set; resolution_remaining_min = max(remaining at pause, 0). While paused
-            resolution_due_at is the pre-pause value and is only recomputed on resume.
-- resolved: resolved_at set; resolution_remaining_min = max(remaining at resolve, 0), kept
-            for a reopen (D-013).
+- paused:   paused_at set; resolution_remaining_min = max(remaining at pause, 0) (shown by the
+            badge, adjusted by PRI-4). While paused resolution_due_at is the pre-pause value
+            (moved only by a priority change); on resume it moves forward by the waiting time.
+- resolved: resolved_at set; resolution_remaining_min = max(remaining at resolve, 0). On a
+            reopen the due moves forward by the resolved time (D-013, D-026).
 """
 
 from dataclasses import dataclass, replace
@@ -120,21 +122,19 @@ def pause(clock: Clock, now: datetime, holidays: Holidays) -> Clock:
 def resume(clock: Clock, now: datetime, holidays: Holidays) -> Clock:
     """WAIT-3 (customer replies to a waiting ticket) and RO-1 / D-013 (reopen of a resolved one).
 
-    remaining > 0 → resolution due = now + remaining working minutes; remaining == 0 → the
-    old due time is kept (breach preserved). Clears paused_at, resolved_at and the stored
-    remaining, so the resolution target is unmet and running again.
+    D-026: due = old_due + working_minutes_between(paused_at or resolved_at, now). The time
+    spent waiting on the customer (or resolved) is excluded for every ticket: an on-time
+    ticket lands on now + remaining; a breached one stays late by exactly the amount it was
+    late at the pause/resolve and keeps counting from there. Clears paused_at, resolved_at
+    and the stored remaining, so the resolution target is unmet and running again.
     """
-    if clock.paused_at is None and clock.resolved_at is None:
+    stopped_at = clock.paused_at if clock.paused_at is not None else clock.resolved_at
+    if stopped_at is None:
         raise ValueError("clock is neither paused nor resolved")
-    remaining = clock.resolution_remaining_min
-    if remaining is None:
-        raise ValueError("paused/resolved clock has no stored remaining minutes")
-    due = clock.resolution_due_at
-    if remaining > 0:
-        due = add_working_minutes(now, remaining, holidays)
+    waited = working_minutes_between(stopped_at, now, holidays)
     return replace(
         clock,
-        resolution_due_at=due,
+        resolution_due_at=add_working_minutes(clock.resolution_due_at, waited, holidays),
         paused_at=None,
         resolved_at=None,
         resolution_remaining_min=None,
@@ -188,10 +188,10 @@ def change_priority(
     - PRI-2 / D-024 downgrade: remaining_new = new − (old − remaining_now); due = now +
       remaining_new (computed as old_due + (new − old), see _changed_running_due), so an
       overdue ticket still lands on "created_at + new target excluding paused time".
-    - PRI-4 paused: the same rules adjust the stored remaining minutes instead of the due
-      time. If the result is still ≤ 0 (breach preserved), the stored remaining stays 0
-      and the preserved due time moves by the same delta, so the frozen overdue amount
-      equals −result.
+    - PRI-4 paused: the same rules adjust the stored remaining minutes (floored at 0), and
+      the preserved due time moves by the same delta (new − old remaining), so resume
+      (D-026: due + waiting time) lands on resume time + new remaining, and a still-overdue
+      ticket's frozen overdue amount equals −result.
     """
     if new_priority == clock.priority:
         return clock
@@ -217,15 +217,10 @@ def change_priority(
             paused_at, resolution_due, holidays
         )
         new_remaining = _changed_remaining(old_res, new_res, signed, upgrade)
-        if new_remaining > 0:
-            stored = new_remaining
-        else:
-            # Still overdue (only a downgrade gets here with a changed value): shift the
-            # preserved due time by the same delta, i.e. old due + (new − old target).
-            stored = 0
-            delta = new_remaining - signed
-            if delta:
-                resolution_due = add_working_minutes(resolution_due, delta, holidays)
+        stored = max(new_remaining, 0)
+        delta = new_remaining - signed
+        if delta:
+            resolution_due = add_working_minutes(resolution_due, delta, holidays)
     else:
         resolution_due = _changed_running_due(
             resolution_due, old_res, new_res, upgrade, now, holidays

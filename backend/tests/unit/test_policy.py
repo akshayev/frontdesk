@@ -114,7 +114,10 @@ def test_u14_upgrade_while_paused_caps_remaining() -> None:
     changed = change_priority(paused, Priority.urgent, ist(2026, 11, 24, 12), H)
     assert changed.resolution_remaining_min == 540
     assert changed.paused_at == paused.paused_at
-    assert changed.resolution_due_at == paused.resolution_due_at  # due recomputed on resume
+    # preserved due moves by the same delta (−1020): pause time + 540 = Mon 18:30 (D-026)
+    assert changed.resolution_due_at == add_working_minutes(paused.paused_at, 540, H)
+    resumed = resume(changed, ist(2026, 11, 25, 9, 30), H)
+    assert resumed.resolution_due_at == add_working_minutes(ist(2026, 11, 25, 9, 30), 540, H)
 
 
 def test_u14_downgrade_while_paused_uses_d024_formula() -> None:
@@ -138,8 +141,11 @@ def test_u14_downgrade_while_paused_and_overdue_keeps_breach_consistent() -> Non
     assert changed.resolution_remaining_min == 0
     assert changed.resolution_due_at == ist(2026, 11, 25, 18, 30)
     assert badge(changed, ist(2026, 11, 27, 15), H) == Badge("late", "resolution", 540)
-    # resume keeps the (moved) preserved due: WAIT-3
-    assert resume(changed, ist(2026, 11, 30, 10), H).resolution_due_at == ist(2026, 11, 25, 18, 30)
+    # D-026: resume Mon 10:00 shifts the due by the 570 waiting minutes → Fri 27 10:00,
+    # so the ticket is still late by exactly 540 at resume time
+    resumed = resume(changed, ist(2026, 11, 30, 10), H)
+    assert resumed.resolution_due_at == ist(2026, 11, 27, 10)
+    assert badge(resumed, ist(2026, 11, 30, 10), H) == Badge("late", "resolution", 540)
 
 
 # --- pause / resume (WAIT-3, RO-1, D-013) -----------------------------------------------
@@ -154,8 +160,8 @@ def test_u15_pause_resume_preserves_remaining() -> None:
     assert working_minutes_between(ist(2026, 11, 24, 10, 30), resumed.resolution_due_at, H) == 1560
 
 
-def test_u16_pause_when_overdue_keeps_old_due() -> None:
-    """U-16 / WAIT-3: overdue at pause → remaining 0, old due kept on pause AND on resume."""
+def test_u16_pause_when_overdue_keeps_old_due_while_paused() -> None:
+    """U-16 / WAIT-3: overdue at pause → remaining 0 and the old due is kept while paused."""
     clock = replied(initial_clock(Priority.urgent, ist(2026, 11, 23, 9, 30), H),
                     ist(2026, 11, 23, 9, 40))
     old_due = clock.resolution_due_at
@@ -163,8 +169,46 @@ def test_u16_pause_when_overdue_keeps_old_due() -> None:
     paused = pause(clock, ist(2026, 11, 24, 10), H)
     assert paused.resolution_remaining_min == 0
     assert paused.resolution_due_at == old_due
-    resumed = resume(paused, ist(2026, 11, 25, 10), H)
-    assert resumed.resolution_due_at == old_due
+
+
+def test_d026_breached_resume_excludes_waiting_time() -> None:
+    """D-026: overdue 30 at pause → 2 working days waiting → resume → 60 working min later
+    the badge is late 90 (30 frozen + 60 after resume), not late by the waiting days too."""
+    clock = replied(initial_clock(Priority.urgent, ist(2026, 11, 23, 9, 30), H),
+                    ist(2026, 11, 23, 9, 40))  # resolution due Mon 18:30
+    paused = pause(clock, ist(2026, 11, 24, 10), H)  # Tue 10:00: 30 overdue
+    resumed = resume(paused, ist(2026, 11, 26, 10), H)  # Thu 10:00: 1080 waiting minutes
+    assert resumed.resolution_due_at == add_working_minutes(ist(2026, 11, 23, 18, 30), 1080, H)
+    assert badge(resumed, ist(2026, 11, 26, 10), H) == Badge("late", "resolution", 30)
+    assert badge(resumed, ist(2026, 11, 26, 11), H) == Badge("late", "resolution", 90)
+
+
+def test_d026_on_time_resume_equals_now_plus_remaining() -> None:
+    """D-026: for an on-time ticket old_due + waiting == now + remaining (incl. weekend and
+    outside-hours resume times)."""
+    xmas = frozenset({date(2026, 12, 25)})
+    clock = replied(initial_clock(Priority.low, ist(2026, 12, 21, 9, 30), xmas),
+                    ist(2026, 12, 21, 9, 45))
+    paused = pause(clock, ist(2026, 12, 21, 11, 0), xmas)
+    remaining = paused.resolution_remaining_min
+    assert remaining == 2610
+    for now in (ist(2026, 12, 22, 12, 17), ist(2026, 12, 24, 20, 0), ist(2026, 12, 26, 11, 0),
+                ist(2026, 12, 28, 9, 30)):
+        resumed = resume(paused, now, xmas)
+        assert resumed.resolution_due_at == add_working_minutes(now, remaining, xmas)
+
+
+def test_d026_reopen_excludes_resolved_time() -> None:
+    """D-026 / RO-1: a ticket resolved late and reopened stays late by the same amount at
+    reopen time; the days it sat resolved are not counted against the team."""
+    clock = replied(initial_clock(Priority.urgent, ist(2026, 11, 23, 9, 30), H),
+                    ist(2026, 11, 23, 9, 40))  # resolution due Mon 18:30
+    done = resolve(clock, ist(2026, 11, 24, 10, 15), H)  # 45 late
+    assert badge(done, ist(2026, 11, 25, 10), H) == Badge("late", "resolution", 45)
+    reopened = resume(done, ist(2026, 11, 27, 10), H)  # Fri, 3 days later
+    assert reopened.resolved_at is None
+    assert badge(reopened, ist(2026, 11, 27, 10), H) == Badge("late", "resolution", 45)
+    assert badge(reopened, ist(2026, 11, 27, 10, 30), H) == Badge("late", "resolution", 75)
 
 
 def test_resolve_then_reopen_resumes_with_remaining() -> None:
