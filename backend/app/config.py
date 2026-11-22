@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     database_url: SecretStr | None = None
     migration_database_url: SecretStr | None = None
+    app_db_password: SecretStr | None = None
     session_secret: SecretStr | None = None
     app_env: str = "development"
     public_base_url: str = "http://localhost:8000"

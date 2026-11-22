@@ -75,6 +75,12 @@ Targets (working min): urgent 120/540 · medium 270/1620 · low 540/2700. Calend
 ## D-022 · 10:45 · Internal notes in a separate table + architecture test
 - `internal_notes` separate from `messages`; customer schema/API modules must not import it (tests/architecture A-1); audit payloads reference ids, never note bodies.
 
+## D-023 · S1 · App DB role and its password
+- App DB role password comes from env `APP_DB_PASSWORD`. Migration creates role `frontdesk_app` (LOGIN, NOSUPERUSER, NOCREATEDB, NOCREATEROLE, NOINHERIT) if missing. The password is passed with `SELECT set_config('fd.app_pw', :pw, true)` and used inside a DO block via `format('... PASSWORD %L', current_setting('fd.app_pw'))` — never string-formatted in Python. Migrations run as the owner role; the app connects as `frontdesk_app`.
+
+## D-024 · S1 · One formula for downgrade and paused priority changes
+- Downgrade and paused priority changes use one formula: `remaining_new = new_target − (old_target − remaining_now)`; `due = now + remaining_new` (if not paused). Equivalent to "created_at + new_target excluding paused time" with no extra column.
+
 ---
 
 ## Incident → design map (interview)

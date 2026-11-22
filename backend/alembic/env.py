@@ -1,8 +1,7 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
-
 from alembic import context
+from sqlalchemy import Connection, engine_from_config, pool
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -10,8 +9,10 @@ config = context.config
 
 from app.config import get_settings  # noqa: E402
 
+# Migrations always run as the OWNER role (MIGRATION_DATABASE_URL), never as frontdesk_app.
+# Tests may instead pass an open owner connection via config.attributes["connection"].
 _url = get_settings().migration_database_url
-if _url is not None:
+if _url is not None and not config.get_main_option("sqlalchemy.url"):
     config.set_main_option("sqlalchemy.url", _url.get_secret_value().replace("%", "%%"))
 
 # Interpret the config file for Python logging.
@@ -62,6 +63,11 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    given = config.attributes.get("connection")
+    if given is not None:
+        _run_with(given)
+        return
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -69,12 +75,18 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        _run_with(connection)
 
-        with context.begin_transaction():
-            context.run_migrations()
+
+def _run_with(connection: Connection) -> None:
+    """Run all pending migrations on one connection, in one transaction (transactional DDL)."""
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        transaction_per_migration=False,
+    )
+    with context.begin_transaction():
+        context.run_migrations()
 
 
 if context.is_offline_mode():
