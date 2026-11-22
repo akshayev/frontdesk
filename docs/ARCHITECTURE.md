@@ -28,6 +28,7 @@ frontdesk/
     alembic.ini  alembic/versions/
     app/
       main.py               app factory, middleware, routers, static SPA mount, lifespan (sweep loop)
+      spa.py                serves the built React app (API paths never swallowed, cache rules, D-037)
       config.py             pydantic-settings
       db.py                 engine, session dependency, request "now" from DB
       models.py             SQLAlchemy models
@@ -45,9 +46,12 @@ frontdesk/
       schemas/customer.py   Pydantic models for customer + public APIs — MUST NOT import InternalNote
       jobs/sweep.py         auto-close (WAIT-4, RO-3) + the lifespan loop (sweep_once / sweep_loop)
     scripts/seed.py         demo data through the domain functions (`uv run python -m scripts.seed`)
+    scripts/export_openapi.py  OpenAPI JSON to stdout (frontend contract, `npm run gen:api`)
     tests/unit/  tests/integration/  tests/architecture/
                             integration/api_support.py: API test harness (frozen DB time, direct sessions)
   frontend/                 Vite React TS Tailwind TanStack Query
+    openapi.json  src/api/schema.d.ts   generated contract (committed; `npm run check:api`)
+    src/app src/api src/features/<area> src/components/ui src/lib   (D-037)
 ```
 
 ## 3. Data model (PostgreSQL)
@@ -134,7 +138,8 @@ Ops: `GET /healthz`
 Errors: JSON `{error: code, message, request_id}`; codes include `stale_version`, `already_claimed`, `illegal_transition`, `forbidden`, `rate_limited`, `validation_error`.
 
 ## 11. Frontend routes
-`/login`, `/tickets` (list), `/tickets/:id`, `/reports/late` (lead), `/holidays` (lead), `/new` (public submit), `/t` (customer view; token read from `location.hash`, sent as `X-Ticket-Token`, then removed from the address bar with `history.replaceState`).
+`/` (redirect by session), `/login`, `/tickets` (list), `/tickets/:id`, `/reports/late` (lead), `/holidays` (lead), `/new` (public submit), `/t` (customer view; token read from `location.hash` on every load and sent as `X-Ticket-Token`; it stays in the fragment so refresh and bookmarks keep working — D-038 supersedes the earlier `history.replaceState` plan), `*` → not found. Lazy route chunks; guards via `GET /api/auth/me`; architecture in D-037.
+Serving (`app/spa.py`): API routes win; unknown `/api/*` → JSON 404; `/assets/*` → `Cache-Control: public, max-age=31536000, immutable`; any other GET → `index.html` with `no-cache`. The CSP is the same as on every response.
 
 ## 12. Deployment
 Dockerfile stage 1 `node:20` builds `frontend/dist`; stage 2 `python:3.12-slim` installs backend with uv, copies dist to `app/static`, runs `alembic upgrade head` (owner URL) then `uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'`. `'*'` is acceptable only because Render's proxy is the sole way to reach the container — to be confirmed in the deploy sprint.

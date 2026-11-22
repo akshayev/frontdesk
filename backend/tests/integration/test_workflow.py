@@ -379,8 +379,8 @@ def test_full_workflow_then_audit_verify_ok(api: ApiHarness) -> None:
     assert T0.tzinfo is UTC
 
 
-def test_d041_write_after_window_closes_old_ticket_in_same_transaction(api: ApiHarness) -> None:
-    """D-041: resolved past the 7-day window and the sweep has NOT run yet → the customer's
+def test_i10_d041_write_after_window_closes_old_ticket_in_same_transaction(api: ApiHarness) -> None:
+    """I-10 / D-041: resolved past the 7-day window and the sweep has NOT run yet → the customer's
     message creates the child ticket AND closes the old one in the same request: reason
     reopen_window_expired, actor customer, child_ticket_id in the payload. The sweep then has
     nothing left to do for it."""

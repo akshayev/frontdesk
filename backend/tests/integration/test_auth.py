@@ -60,6 +60,8 @@ def _app(auth_db: tuple[Engine, Engine], production: bool = False) -> FastAPI:
     def boom() -> None:
         raise RuntimeError("secret internal detail")
 
+    # The SPA catch-all (app/spa.py) must stay the last route, after these test-only probes.
+    app.router.routes.sort(key=lambda route: getattr(route, "path", "") == "/{path:path}")
     return app
 
 

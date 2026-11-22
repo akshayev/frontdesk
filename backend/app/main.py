@@ -1,6 +1,6 @@
 """FastAPI app factory: settings/engine on app.state, middleware, error handlers, routers, and
-the lifespan that runs the auto-close sweep loop (ARCHITECTURE §2, §9). The static SPA mount
-comes with the frontend sprint.
+the lifespan that runs the auto-close sweep loop (ARCHITECTURE §2, §9), and — registered last —
+the catch-all that serves the built React app (app/spa.py).
 
 Request path, outermost first:
   1. SecurityHeadersMiddleware — assigns the request id, adds the SECURITY §5 headers to every
@@ -27,6 +27,7 @@ from app.jobs.sweep import sweep_loop
 from app.security.csrf import CSRFMiddleware
 from app.security.headers import SecurityHeadersMiddleware, install_error_handlers
 from app.security.ratelimit import install_rate_limiting
+from app.spa import install_spa, resolve_static_dir
 
 
 @contextlib.asynccontextmanager
@@ -75,6 +76,8 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
+    # Last: every API route above wins over the SPA catch-all.
+    install_spa(app, resolve_static_dir(settings.static_dir))
     return app
 
 

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     public_base_url: str = "http://localhost:8000"
     sweep_enabled: bool = True  # ARCHITECTURE §9 loop; tests set SWEEP_ENABLED=false
     seed_demo_password: SecretStr | None = None  # scripts/seed.py only; never hard-coded
+    static_dir: str | None = None  # built SPA; default app/static, else ../frontend/dist (app.spa)
 
 
 @lru_cache
