@@ -1,7 +1,8 @@
 """Demo data: `uv run python -m scripts.seed` (from backend/). Implements the S3 seed brief.
 
 - Refuses to run unless the tickets table is empty; needs SEED_DEMO_PASSWORD (never
-  hard-coded) for the 10 demo accounts (lead Meera + 9 agents, @arvo.example).
+  hard-coded) for the 11 demo accounts (leads Meera and Rohini + 9 agents, @arvo.example).
+  Two leads (D-044): the demo emails are public and lockout (D-029) can lock one of them.
 - Builds ~20 tickets that cover every state (new, open, waiting, late response, late
   resolution, at risk, resolved, closed by both sweep reasons, priority change, reopen, a child
   of a closed ticket, notes). It does so by building a chronological list of actions with
@@ -34,7 +35,8 @@ from app.security.passwords import hash_password
 from app.sla.calendar import Holidays, add_working_minutes
 from app.sla.policy import AUTO_CLOSE_WORKING_MIN, REOPEN_WINDOW, Priority
 
-LEAD = ("Meera", "meera@arvo.example")
+# D-044: two leads, so one locked-out lead account cannot block an evaluation.
+LEADS = [("Meera", "meera@arvo.example"), ("Rohini Krishnan", "rohini@arvo.example")]
 AGENTS = [
     ("Priya Sharma", "priya@arvo.example"),
     ("Arjun Nair", "arjun@arvo.example"),
@@ -322,11 +324,15 @@ def _script(t: Timeline, demo: Demo) -> None:
 
 def _ensure_agents(factory: sessionmaker[Session], password: str,
                    created_at: datetime) -> dict[str, Agent]:
-    """Create the 10 demo accounts (agents are not ticket data, so a plain insert is fine)."""
+    """Create the 11 demo accounts (D-044: 2 leads + 9 agents).
+
+    Agents are not ticket data, so a plain insert is fine.
+    """
     agents: dict[str, Agent] = {}
     with factory() as session, session.begin():
-        for (name, email), role in [(LEAD, AgentRole.lead)] + [(a, AgentRole.agent)
-                                                               for a in AGENTS]:
+        accounts = [(lead, AgentRole.lead) for lead in LEADS] + \
+            [(agent, AgentRole.agent) for agent in AGENTS]
+        for (name, email), role in accounts:
             agent = session.scalars(select(Agent).where(Agent.email == email)).one_or_none()
             if agent is None:
                 agent = Agent(email=email, name=name, role=role,
@@ -381,7 +387,8 @@ def main() -> int:
     print(f"audit verify: ok={report.verify_ok} checked={report.verify_checked}")
     print("tickets per status: " + ", ".join(f"{k}={v}" for k, v in
                                              report.status_counts.items()))
-    print(f"accounts: {LEAD[1]} (lead) + {len(AGENTS)} agents @arvo.example, "
+    leads = " + ".join(email for _, email in LEADS)
+    print(f"accounts: {leads} (leads) + {len(AGENTS)} agents @arvo.example, "
           "password = SEED_DEMO_PASSWORD")
     for key, link in report.links.items():
         print(f"  {key}: {link}")

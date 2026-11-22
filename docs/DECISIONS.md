@@ -150,43 +150,29 @@ Targets (working min): urgent 120/540 · medium 270/1620 · low 540/2700. Calend
 - Rejected: leaving the close to the sweep (the inconsistent window described above).
 
 ## D-033 · S4 · UI patterns for reply vs note, collisions, badges and customer status (approved by owner, Sprint 4; refines D-030)
-- **Two separate buttons, no toggle.** The composer has "Reply to customer" (indigo) and "Add internal note" (yellow) side by side. Note mode turns the whole composer strong yellow (amber-100 background, amber-500 border), shows a lock icon and the banner "Internal note — only your team can see this", and its submit button reads "Save internal note". Reply mode submits with "Send to customer" and offers the checkbox "and wait for the customer's answer" (WAIT-2). Notes in the conversation use the same yellow, lock icon and "Internal note" label. Keyboard: R / N switch mode only when focus is not in a text field.
-- **409 collision banner keeps the draft.** On `stale_version` the composer shows "This ticket changed while you were writing. Review the latest activity, then send again." and refetches; the typed text is never cleared. `already_claimed` → toast "Already taken by {owner}" + refetch.
-- **Badge texts** (colour + text + `title` with the exact due time in IST "working hours"): late "Late 1h 20m" (red), at_risk "Due in 45m" (amber), on_track "Due in 3h 10m" (green), paused "Paused" (slate), met "Met" (emerald). Minutes are working minutes, formatted `formatWorkingMinutes` ("1h 20m", "45m", "2h").
-- **Customer status labels:** new → "Received — we will reply soon"; open → "We are working on it"; waiting_on_customer → "Waiting for your reply"; resolved and reopenable → "Resolved — not fixed? You can reopen until <date IST>"; resolved past the window or closed → "Closed — writing here starts a new request".
-- **The secret link is shown once** (public form, agent "New ticket", RO-4 follow-up) with a Copy button and "Save this link — it's your private key to this request. Don't share it." (agent version: "Share only with this customer").
-- Why: INC-0304 happened because the two composers looked alike; a toggle hides the current mode in one small control. Losing a long reply to a 409 makes agents distrust the collision check.
-- Rejected: one composer with a reply/note toggle (mode not obvious); a note option inside a menu (D-030); clearing the draft on 409.
+UI patterns from 10 helpdesks (Zendesk, Freshdesk, Freshservice, Help Scout, Intercom, Jira SM, Groove, Teamwork Desk, Chatwoot, Sprout Social): separate "Reply to customer" / "Add internal note" buttons, no toggle; note = strong yellow + lock icon + banner + labelled button (colour-blind safe; Zendesk users report pale yellow and toggle errors; Freshdesk public-note checkbox caused problems). 409 stale_version shown as a Help Scout-style collision banner, draft kept. SLA badge text "Late 1h 20m" / "Due in 45m" / "Paused"; sticky late + Late view fixes Zendesk's disappearing-breach complaint. Customer-facing labels: Received / We're working on it / Waiting for your reply / Resolved — reopen until <date> / Closed. Customer page: "Save this link — it's your private key" + Copy link.
 
 ## D-036 · S4 · Visual identity: iNav-aligned palette, no iNav branding (approved by owner, Sprint 4)
-- Palette: primary #2A2E9F (brand-600), navy #1A1E45 (top bar, navy-900), accent #19326D (accent-700), body text #4D4D4D (ink). Pill buttons (`rounded-full`), cards with 16–20 px radius (`rounded-2xl`). Status colours: late red, at risk amber, on track green, paused slate, met emerald; internal notes amber.
-- No iNav logo or name in the app: the product is "Frontdesk · Arvo Systems" (the story's company).
-- Font: Inter (variable) via Fontsource, bundled and served from our origin — instead of Satoshi, whose licence is unclear for a public repo; a font CDN would add a third-party origin and break the strict CSP (SECURITY §5).
-- Rejected: Satoshi (licence), Google Fonts CDN (third-party origin), system font only (looks unfinished).
+Visual language aligned with iNav/Coligo (palette #2A2E9F / #1A1E45 / #19326D, text #4D4D4D, pill buttons, 16–20 px cards), extracted from navtechnologies.in styles; no iNav logo/name (Frontdesk belongs to Arvo). Inter (OFL, bundled via Fontsource, served from our origin) instead of Satoshi: sources conflict on publicly re-hosting Satoshi files and our repo goes public; Fontshare CDN would add a third-party origin to the CSP.
 
 ## D-037 · S4 · Frontend architecture (approved by owner, Sprint 4; refines D-004)
-- **Contract = the real OpenAPI.** `scripts/export_openapi.py` writes the schema; `openapi-typescript` generates `src/api/schema.d.ts`; both files are committed; `npm run check:api` regenerates and fails on any diff (CI). One typed fetch wrapper `src/api/client.ts`: same origin, `credentials: 'same-origin'`, JSON, `X-Requested-With: frontdesk` on every non-GET, `X-Ticket-Token` for customer calls, non-2xx → `ApiError {status, code, message, requestId, extra}`. No `any`.
-- **Server is authoritative.** TanStack Query with a key factory per entity; lists poll every 30 s, the ticket page every 15 s, both refetch on window focus, nothing polls in a background tab; retry off for 4xx. NO optimistic updates for claim / reply / note / resolve / priority / assign: the UI shows the server's answer (each mutation returns the fresh ticket page) and invalidates `ticketKeys.all`. Action buttons come only from `allowed_actions`.
-- **Global error policy:** 401 on agent routes → clear cache, `/login?next=…`; 403 → "You don't have access"; 409 already_claimed → toast + refetch; 409 stale_version → collision banner keeping the draft (D-033); 409 reply_required / illegal_transition / reopen_window_expired → inline message; 429 → toast "Too many requests — wait a minute"; 5xx / network → error state with the request id.
-- **Routing:** React Router (declarative mode, package `react-router`), lazy route chunks; guards RequireAgent / RequireLead use `GET /api/auth/me`. Folders: `src/app` (router, providers, layout, guards, error boundary), `src/api`, `src/features/<area>/{queries.ts,components,pages}`, `src/components/ui`, `src/lib`.
-- **CSP-clean UI:** no inline `style` props, no `dangerouslySetInnerHTML`; message bodies render as text (`whitespace-pre-wrap`). Fonts and all assets are bundled (no `data:` inlining, no third-party origins).
-- **Serving:** FastAPI serves the build (`app/spa.py`): API paths never swallowed (unknown `/api/*` → JSON 404), any other GET → index.html (`no-cache`), `/assets/*` hashed files `immutable` for a year; the CSP is unchanged.
-- Rejected: hand-written API types (drift); optimistic updates (a claim race would flash a wrong owner — INC-0291); a global store (Redux/Zustand: server state is all we have); Next.js (D-004).
+Frontend architecture: React 19 + TS strict, Vite, Tailwind v4, React Router v8 declarative (package react-router; react-router-dom removed in v8), TanStack Query v5 with key factories, feature folders. TS types generated from backend /openapi.json (openapi-typescript) with a drift check. No optimistic updates for claims/SLA actions (server authoritative — optimistic "claimed" would recreate INC-0291 on screen). Polling 30 s list / 15 s detail, paused in background. Rejected: Redux/Zustand, UI kits, react-router-dom.
 
 ## D-038 · S4 · The customer token stays in the URL fragment (approved by owner, Sprint 4; supersedes ARCHITECTURE §11 `history.replaceState`)
-- The `/t#<token>` page reads the token from `location.hash` on every load and sends it as `X-Ticket-Token`; it does NOT remove it from the address bar.
-- Why: the link is the customer's only key (no account). Removing it breaks refresh, "add to home screen" and bookmarking, and makes the "Save this link" advice wrong for anyone who copies the address bar. The fragment is never sent to any server, never appears in a Referer (and Referrer-Policy is no-referrer), and never reaches our access logs — the reasons for D-017 still hold.
-- Accepted risk: the token stays in browser history on the customer's own device (same as any password-reset style link). Mitigation: one-ticket scope, 30/min/IP limit, hash-only storage.
-- Rejected: `replaceState` (above); moving the token into sessionStorage (lost when the tab closes, and the customer has nothing to re-open it with).
+Customer token stays in the URL fragment (not stripped). Supersedes ARCHITECTURE §11 replaceState. Stripping breaks refresh/bookmark; the fragment never reaches the server; Referrer-Policy no-referrer is already set.
 
 ## D-039 · S4 · Frontend unit tests: Vitest + Testing Library for three critical units (approved by owner, Sprint 4; refines D-018)
-- Vitest + @testing-library/react + user-event + jsdom, `npm test`. Exactly the units where a bug repeats an incident or breaks the contract: (a) the Composer — note mode shows banner, lock icon and "Save internal note", reply mode "Send to customer", switching modes never posts to the wrong endpoint (INC-0304); (b) `client.ts` — error JSON → ApiError, non-JSON bodies, `X-Requested-With` on non-GET only; (c) `formatWorkingMinutes` and the badge text for every state.
-- Why: D-018 kept the frontend at type-check + build. The composer is the INC-0304 surface and the client is the whole API contract — both worth a cheap, fast test. Browser E2E stays out of scope (PRD §12).
-- Rejected: Playwright E2E (time, PRD §12); Jest (second config next to Vite); no frontend tests (D-018 as it was).
+Frontend unit tests (refines D-018): Vitest + Testing Library for composer note/reply labelling and endpoint routing, API error parsing, duration formatting.
 
 ## D-042 · S4 · Frontend uses TypeScript 5.9.3, not 7.0.x (approved by owner, Sprint 4)
 - Frontend uses TypeScript 5.9.3, not 7.0.x — TS 7's native compiler has no JS compiler API, which openapi-typescript (and possibly other tooling) needs; one stable compiler for the whole app.
 - Rejected: separate codegen package with its own TS 5 (two compilers, extra lockfile).
+
+## D-043 · S5 · Least-privilege production deploy (approved by owner, Sprint 5)
+Least privilege in production: the web service only receives the frontdesk_app DATABASE_URL. Migrations and the seed run from the developer machine with the Neon owner role (.env.neon). A compromised web server cannot disable audit triggers or alter grants.
+
+## D-044 · S5 · Two demo lead accounts (approved by owner, Sprint 5)
+Two demo lead accounts (Meera + a second lead) because the public README lists demo emails and lockout (D-029) can be abused to lock an account; one locked lead cannot block evaluation. SECURITY §7: lockout can be abused for denial of service; production would add CAPTCHA / per-IP+account throttling.
 
 ---
 

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.config import Settings, get_settings
 from app.db import load_holidays
 from app.domain.tickets import clock_of
-from app.models import AuditEvent, InternalNote, Ticket, TicketStatus
+from app.models import Agent, AgentRole, AuditEvent, InternalNote, Ticket, TicketStatus
 from app.sla import policy
 from scripts import seed
 from tests.integration.conftest import migrated_database
@@ -51,6 +51,16 @@ def test_seed_covers_the_demo_scenarios(seeded_db) -> None:
     assert any(t.reopen_count == 1 for t in tickets)
     assert {"priority_changed", "released", "assigned", "auto_closed", "reopened"} <= events
     assert notes >= 4
+
+
+def test_seed_creates_two_leads(seeded_db) -> None:
+    """D-044: two lead accounts, so one locked-out lead cannot block an evaluation."""
+    owner, _, _, _ = seeded_db
+    with Session(owner) as s:
+        roles = {email: role for email, role in s.execute(select(Agent.email, Agent.role))}
+    leads = sorted(email for email, role in roles.items() if role == AgentRole.lead)
+    assert leads == ["meera@arvo.example", "rohini@arvo.example"]
+    assert len(roles) == 11 and all(email.endswith("@arvo.example") for email in roles)
 
 
 def test_seed_refuses_non_empty_db_and_missing_password(seeded_db) -> None:

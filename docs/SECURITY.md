@@ -40,6 +40,7 @@ The CSP is the same on every path. Swagger UI (`/docs`) is served in development
 - In-memory rate limits reset on restart.
 - IP addresses in the immutable audit log cannot be erased — accepted for security forensics; production would add a retention design. (Login events, D-031; emails are never stored there — actor_id or HMAC only.)
 - Demo credentials are published in README for evaluators; a real deployment would force password change.
+- Lockout (D-029) can be abused for denial of service: anyone who knows a published demo email can lock that account for 15 minutes. Mitigation for the demo: two lead accounts (D-044). Production would add CAPTCHA / per-IP+account throttling.
 - `--forwarded-allow-ips='*'` relies on Render's proxy being the only ingress.
 - No email delivery, so "reply sent" means "recorded in Frontdesk".
 
