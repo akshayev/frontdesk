@@ -41,7 +41,7 @@ All tests run with `uv run pytest`. Integration tests use real PostgreSQL 16 (do
 | I-9 | Customer reply to waiting ticket resumes clock | status open, due recalculated |
 | I-10 | Customer writes to closed ticket | new ticket with parent_ticket_id |
 | I-11 | Sweep closes silent waiting ticket after 5 working days; actor system | closed, audit event |
-| I-12 | Login lockout after 5 failures; audited | 423 / locked, events present |
+| I-12 | Login lockout after 5 failures; audited | locked (correct password then refused with the same generic 401 as any failure, D-029); login_failed + account_locked events present |
 | I-13 | Non-GET agent request without `X-Requested-With` | 403 |
 | I-14 | Customer token for ticket A cannot read ticket B | 404 |
 

@@ -104,6 +104,11 @@ Targets (working min): urgent 120/540 · medium 270/1620 · low 540/2700. Calend
 - httpx2 not added — unverified package taken from a warning text (typosquatting risk). The single StarletteDeprecationWarning is filtered by exact message in pytest config.
 - Why: CLAUDE.md requires approval for new dependencies; a package name suggested only by a runtime warning is not a trustworthy source.
 
+## D-029 · S2 · Login failures are indistinguishable (approved by owner, Sprint 2)
+- Login always returns 401 with one generic message ('Invalid email or password, or the account is temporarily locked') for unknown email, wrong password and locked account — no account enumeration. Lockout (5 failures → locked_until = now + 15 min) and every failure/lock are audited (login_failed, account_locked, login_succeeded). Supersedes '423' in TEST-PLAN I-12.
+- Implementation notes: a full Argon2 verification runs on every path (dummy hash for unknown emails) so timing is equal too; attempts while locked are audited as login_failed (reason "locked") and do not extend the lock; the failure count resets only on success (SECURITY §2). The 401 is returned, not raised, so the request transaction commits the counter and the audit events.
+- Rejected: 423 for locked accounts (tells an attacker the email exists and that guessing is working).
+
 ---
 
 ## Incident → design map (interview)

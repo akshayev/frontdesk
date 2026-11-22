@@ -48,3 +48,11 @@ Login 5/min/IP · customer + public 30/min/IP · agent API 120/min/session. Limi
 - [ ] Every mutation goes through domain layer (version check + audit event)
 - [ ] pip-audit / npm audit clean or findings noted
 - [ ] No raw SQL built with string formatting
+
+### Sprint 2 review (22 Nov 2026)
+- [x] No secrets in diff — `git diff | grep -iE "password|secret|key|token"` reviewed (only identifiers, docstrings and the test-fixture password); secret-guard scan clean; Neon URL and app password only in git-ignored `.env.neon`.
+- [x] Every new endpoint has an auth dependency and a rate-limit group — `POST /api/auth/login` (public by design; `limit_login` 5/min/IP), `POST /api/auth/logout` and `GET /api/auth/me` (`CurrentAuth`/`CurrentAgent`; `limit_agent` 120/min/session). `/healthz` unchanged (ops, no auth).
+- [x] Every new customer-facing schema checked: no note fields — none added; `AgentOut` has no password_hash / lock fields.
+- [x] Every mutation goes through domain layer — no ticket mutations this sprint (domain layer is S3). Auth writes (agents lockout fields, sessions) are audited via `append_event`.
+- [x] pip-audit / npm audit clean — both "No known vulnerabilities" / "found 0 vulnerabilities".
+- [x] No raw SQL built with string formatting — all new SQL is SQLAlchemy constructs or bound parameters.
