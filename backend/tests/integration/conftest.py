@@ -12,6 +12,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from alembic import command
@@ -20,6 +21,9 @@ from sqlalchemy import Connection, Engine, create_engine, text
 from sqlalchemy.engine import URL, make_url
 
 from app.config import get_settings
+
+if TYPE_CHECKING:
+    from tests.integration.api_support import ApiHarness
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 TEST_DB = "frontdesk_test"
@@ -187,3 +191,29 @@ def owner_conn(owner_engine: Engine, seeded: dict[str, object]) -> Iterator[Conn
 def app_conn(app_engine: Engine, seeded: dict[str, object]) -> Iterator[Connection]:
     """frontdesk_app connection; everything is rolled back after the test."""
     yield from _rolled_back(app_engine)
+
+
+# --- API fixtures (Sprint 3) ------------------------------------------------------------------
+# A fresh migrated database per test module, an app whose request `now` can be frozen and
+# moved (ARCHITECTURE §6: tests override the time source), and agents signed in by inserting
+# a session row directly (no Argon2, no login rate limit, no 12 h expiry during time travel).
+
+
+@pytest.fixture(scope="module")
+def api_engines(request: pytest.FixtureRequest) -> Iterator[tuple[Engine, Engine]]:
+    """(owner engine, app engine) for a throwaway database named after the test module."""
+    module = request.module.__name__.rsplit(".", 1)[-1].removeprefix("test_")
+    name = "frontdesk_" + re.sub(r"[^a-z_]", "", module) + "_test"
+    with migrated_database(name) as engines:
+        yield engines
+
+
+@pytest.fixture
+def api(api_engines: tuple[Engine, Engine]) -> Iterator["ApiHarness"]:
+    """An ApiHarness with frozen time at Mon 23 Nov 2026 10:00 IST and fresh rate limits."""
+    from app.security.ratelimit import limiter
+    from tests.integration.api_support import ApiHarness
+
+    limiter.reset()
+    yield ApiHarness.build(*api_engines)
+    limiter.reset()

@@ -27,6 +27,7 @@ Login 5/min/IP · customer 30/min/IP and public 30/min/IP (separate buckets, D-0
 
 ## 5. Headers (middleware)
 `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'` · `X-Frame-Options: DENY` · `X-Content-Type-Options: nosniff` · `Referrer-Policy: no-referrer` · `Strict-Transport-Security: max-age=31536000` (production only).
+The CSP is the same on every path. Swagger UI (`/docs`) is served in development only, because it needs third-party scripts. The read-only `/openapi.json` schema is served everywhere (D-035).
 
 ## 6. Input and output
 - Pydantic validation on every request; subject ≤ 200 chars, bodies ≤ 10 000 chars, emails validated.

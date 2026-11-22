@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     session_secret: SecretStr | None = None
     app_env: str = "development"
     public_base_url: str = "http://localhost:8000"
+    sweep_enabled: bool = True  # ARCHITECTURE §9 loop; tests set SWEEP_ENABLED=false
+    seed_demo_password: SecretStr | None = None  # scripts/seed.py only; never hard-coded
 
 
 @lru_cache

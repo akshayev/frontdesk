@@ -126,6 +126,18 @@ Targets (working min): urgent 120/540 · medium 270/1620 · low 540/2700. Calend
 - `/api/customer` and `/api/public` each have their own 30/min/IP bucket (slowapi shared scopes "customer" and "public").
 - Why: they are different actions (reading/replying on one's own ticket vs. submitting a new one). The customer page polling every 30 s uses 2 requests/min, well inside either limit; a shared bucket adds nothing.
 
+## D-034 · S3 · Agent list views: active-only except All; active tickets always sort first (approved by owner, Sprint 3)
+- Mine = assigned to me and new/open/waiting_on_customer/resolved. Unassigned = unassigned and new/open. Late = badge `late` and status new/open/waiting_on_customer. Waiting = waiting_on_customer. All = every status, including resolved and closed. Every view is capped at 200 rows.
+- Sort: active tickets (new/open/waiting) first — late first (most overdue), then nearest due — then resolved/closed tickets by most recent activity. So the 200 cap never hides an active ticket behind old closed ones.
+- Why: late is sticky (D-025), so counting resolved/closed tickets would turn the Late view into a history list; the lead's late report (RPT-1) is the place for history.
+- Rejected: no status filters (Late and Mine fill up with history); hiding closed tickets everywhere (All would no longer be "all").
+
+## D-035 · S3 · /openapi.json served in production; Swagger UI (/docs) development only (approved by owner, Sprint 3)
+- `/openapi.json` (read-only schema, no secrets) is served in every environment so evaluators can load it into any OpenAPI viewer; the README will link it and list the endpoints. `/docs` (Swagger UI) stays on in development only.
+- Why: Swagger UI loads JS/CSS from a third-party CDN and runs an inline script, so production would need a weaker CSP. No third-party scripts on our origin, and SECURITY §5 stays as it is.
+- Rejected: relaxing the CSP on /docs only; turning /docs on under the strict CSP (the page would render blank).
+- (D-033 is reserved for the UI-pattern research that will be added in Sprint 4.)
+
 ---
 
 ## Incident → design map (interview)

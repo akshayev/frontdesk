@@ -25,6 +25,12 @@ def generate_token() -> tuple[str, bytes]:
     return token, hash_token(token)
 
 
+def customer_link(public_base_url: str, token: str) -> str:
+    """The secret link PUBLIC_BASE_URL/t#<token>. The token is in the fragment, which browsers
+    never send to a server (or in a Referer); the customer page moves it into the header."""
+    return public_base_url.rstrip("/") + "/t#" + token
+
+
 def hash_token(token: str) -> bytes:
     """sha256 of the token (the only stored form)."""
     return hashlib.sha256(token.encode("utf-8")).digest()
