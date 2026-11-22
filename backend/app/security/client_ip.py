@@ -10,10 +10,11 @@ always the real socket peer).
   but cannot change what the trusted proxy appends on the right.
 - A missing, short or malformed header falls back to the socket peer.
 
-Diagnostic (temporary, D-045 live verification): when the fallback happens while hops > 0, one
-WARNING line records the header shape: line and entry counts, the rightmost entry as received
-(max 64 chars) and the NAMES of proxy-related headers present. No header values other than that
-one entry, and never cookies or tokens.
+Diagnostic (temporary, D-045 live verification): while hops > 0, when the code falls back to
+the peer OR the chosen entry is not a public (global) address, one WARNING line records the
+header shape: line and entry counts, the kind of each entry (global/private/invalid, no values),
+the rightmost entry as received (max 64 chars), whether the result equals the peer, and the NAMES
+of proxy-related headers present. No other header values, and never cookies or tokens.
 """
 
 import ipaddress
@@ -51,17 +52,27 @@ def client_ip(request: Request) -> str:
     lines = request.headers.getlist("x-forwarded-for")
     entries = [part for line in lines for part in line.split(",")]
     parsed = _parse(entries[-hops]) if len(entries) >= hops else None
+    result = parsed or _peer(request)
+    if parsed is None or not ipaddress.ip_address(parsed).is_global:
+        _log_diagnostic(request, "fallback to peer" if parsed is None else "non-global entry",
+                        len(lines), entries, result)
+    return result
+
+
+def _kind(entry: str) -> str:
+    parsed = _parse(entry)
     if parsed is None:
-        _log_fallback(request, len(lines), entries)
-        return _peer(request)
-    return parsed
+        return "invalid"
+    return "global" if ipaddress.ip_address(parsed).is_global else "private"
 
 
-def _log_fallback(request: Request, line_count: int, entries: list[str]) -> None:
-    """One diagnostic line for a hops > 0 fallback: header shape and names only (see module doc)."""
+def _log_diagnostic(request: Request, reason: str, line_count: int, entries: list[str],
+                    result: str) -> None:
+    """One diagnostic line (hops > 0): header shape and header names only (see module doc)."""
     names = sorted({name for name in request.headers.keys()
                     if name in _PROXY_HEADER_NAMES or name.startswith(_PROXY_HEADER_PREFIX)})
     rightmost = repr(entries[-1][:64]) if entries else "none"
-    logger.warning("client_ip fallback to peer: xff_lines=%d xff_entries=%d rightmost=%s "
-                   "proxy_headers=%s", line_count, len(entries), rightmost,
+    logger.warning("client_ip %s: xff_lines=%d xff_entries=%d rightmost=%s kinds=%s "
+                   "peer_match=%s proxy_headers=%s", reason, line_count, len(entries), rightmost,
+                   ",".join(_kind(e) for e in entries) or "none", result == _peer(request),
                    ",".join(names) or "none")

@@ -83,7 +83,8 @@ def test_fallback_logs_header_shape_and_names_only(caplog: pytest.LogCaptureFixt
         assert _client(1).get("/ip", headers=headers).json()["ip"] == PEER
     [record] = [r for r in caplog.records if r.name == "frontdesk.client_ip"]
     line = record.getMessage()
-    assert "xff_lines=1 xff_entries=2 rightmost=' banana'" in line
+    assert "fallback to peer: xff_lines=1 xff_entries=2 rightmost=' banana'" in line
+    assert "kinds=private,invalid peer_match=True" in line
     assert "proxy_headers=x-forwarded-for,x-real-ip,x-render-origin-server" in line
     for value in ("198.51.100.1", "secret-value", "tok123", "fd_session", "cookie"):
         assert value not in line
@@ -95,8 +96,16 @@ def test_fallback_log_truncates_the_rightmost_entry(caplog: pytest.LogCaptureFix
     assert "rightmost='" + "x" * 64 + "'" in caplog.records[-1].getMessage()
 
 
-def test_no_fallback_log_with_zero_hops_or_a_valid_entry(caplog: pytest.LogCaptureFixture) -> None:
+def test_no_diagnostic_with_zero_hops_or_a_public_entry(caplog: pytest.LogCaptureFixture) -> None:
     with caplog.at_level("DEBUG", logger="frontdesk.client_ip"):
         _ip(0, "banana")
-        _ip(1, "198.51.100.9")
+        _ip(1, "10.0.0.1, 1.1.1.1")
     assert not [r for r in caplog.records if r.name == "frontdesk.client_ip"]
+
+
+def test_non_global_rightmost_entry_is_used_but_reported(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level("DEBUG", logger="frontdesk.client_ip"):
+        assert _ip(1, "1.1.1.1, 10.0.0.7") == "10.0.0.7"  # behaviour unchanged
+    line = caplog.records[-1].getMessage()
+    assert "non-global entry: xff_lines=1 xff_entries=2 rightmost=' 10.0.0.7'" in line
+    assert "kinds=global,private peer_match=False" in line
