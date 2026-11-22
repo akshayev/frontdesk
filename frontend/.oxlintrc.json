@@ -35,7 +35,12 @@
     "jsx-a11y/anchor-is-valid": "error",
     "jsx-a11y/aria-props": "error",
     "jsx-a11y/aria-role": "error",
-    "jsx-a11y/label-has-associated-control": "error",
+    "jsx-a11y/label-has-associated-control": [
+      "error",
+      {
+        "depth": 3
+      }
+    ],
     "jsx-a11y/no-autofocus": "off",
     "jsx-a11y/role-has-required-aria-props": "error",
     "jsx-a11y/click-events-have-key-events": "error",
