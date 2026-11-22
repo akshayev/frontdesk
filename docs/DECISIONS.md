@@ -187,6 +187,9 @@ Live re-verification of `db2fa69` failed: every audit IP was Render's internal 1
 - Rejected: CF-Connecting-IP / True-Client-IP as the source (only safe if every request is guaranteed to pass Cloudflare, which Render does not document); rightmost public entry (picks the changing Cloudflare edge).
 - Lesson (also SECURITY §7): local container tests cannot reproduce proxy behaviour; proxy-dependent security must be verified on the live platform. Two issues (leftmost spoofing, then rightmost = proxy) were found only by live checks and fixed before submission.
 
+## D-047 · 16:32 · Demo credentials are not published (supersedes part of D-044)
+Demo credentials are not published. The password that appeared in README (commit 727f333) was rotated on production; existing sessions were revoked; README now says credentials are in the submission form, and lists roles only (no emails). Supersedes the 'demo emails + password in README' part of D-044 (two leads still exist, for the lockout reason). Why: a public password lets anyone change evaluation data, and the audit log is permanent so it could not be cleaned.
+
 ---
 
 ## Incident → design map (interview)

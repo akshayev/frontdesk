@@ -22,31 +22,27 @@ A support-ticket desk for Arvo Systems' 9 support agents and their lead: SLA clo
 
 ## Try it in 5 minutes
 
-Use a normal window for agent 1, a private window for agent 2, and a phone or a third window for the customer. Logins are in [Demo accounts](#demo-accounts).
+Use a normal window for agent 1, a private window for agent 2, and a phone or a third window for the customer. Credentials: see [Demo accounts](#demo-accounts).
 
 | # | Do this | You should see |
 |---|---|---|
 | a | **Be the customer.** Open [/new](https://frontdesk-qtlh.onrender.com/new), submit a problem (pick **medium**). **Copy and save the private link** you get — it is shown once. | The customer page: "Received", your message, exact timestamps. |
-| b | **INC-0291 — double claim.** Log in as an agent (e.g. `priya@arvo.example`) → **Unassigned** → open your ticket. In the private window, log in as another agent (`arjun@arvo.example`) and open the same ticket. Put the windows side by side, press **Take this ticket** as Priya, then straight away as Arjun (the page refreshes itself within 15 s). | Priya owns the ticket; Arjun gets **"Already taken by Priya Sharma"**. Only the assignee can reply, resolve or set waiting. |
-| c | **INC-0304 — note leak.** As Priya, write a **Reply to customer**, tick **"and wait for the customer's answer"** and send. Then switch to **Internal note** (yellow, lock icon) and save a note. Open the customer's private link. | The customer sees the reply and "Waiting for your reply"; the note is **not** there — not on the page, not in the API response. Reply as the customer: the ticket is open again and the paused clock resumes. |
-| d | **INC-0318 — "which were late and why".** On the ticket, open **History**: every change, who did it and when (database clock). Log in as the lead `meera@arvo.example` → **Late report** → **Verify audit log**. | The late report lists each late ticket, which target was missed, by how many working minutes, its priority history and the time spent waiting on the customer (CSV export too). Verify says **"Intact — N events checked"** (sha256 hash chain). |
-| e | **Meera's open question — priority change mid-way.** As Priya, change the priority to **urgent** and confirm. Read **History** and the **SLA** panel. | A `priority_changed` event with old/new priority and old/new due times. Resolution is now due at the earlier of the old due and now + 9 working hours; the response target was already met, so it stays met (D-008). |
+| b | **INC-0291 — double claim.** Log in as agent 1 → **Unassigned** → open your ticket. In the private window, log in as agent 2 (a different agent account) and open the same ticket. Put the windows side by side, press **Take this ticket** as agent 1, then straight away as agent 2 (the page refreshes itself within 15 s). | Agent 1 owns the ticket; agent 2 gets **"Already taken by …"** with agent 1's name. Only the assignee can reply, resolve or set waiting. |
+| c | **INC-0304 — note leak.** As agent 1, write a **Reply to customer**, tick **"and wait for the customer's answer"** and send. Then switch to **Internal note** (yellow, lock icon) and save a note. Open the customer's private link. | The customer sees the reply and "Waiting for your reply"; the note is **not** there — not on the page, not in the API response. Reply as the customer: the ticket is open again and the paused clock resumes. |
+| d | **INC-0318 — "which were late and why".** On the ticket, open **History**: every change, who did it and when (database clock). Log in as a support lead → **Late report** → **Verify audit log**. | The late report lists each late ticket, which target was missed, by how many working minutes, its priority history and the time spent waiting on the customer (CSV export too). Verify says **"Intact — N events checked"** (sha256 hash chain). |
+| e | **Meera's open question — priority change mid-way.** As agent 1, change the priority to **urgent** and confirm. Read **History** and the **SLA** panel. | A `priority_changed` event with old/new priority and old/new due times. Resolution is now due at the earlier of the old due and now + 9 working hours; the response target was already met, so it stays met (D-008). |
 
 The seed also contains ~20 tickets in every state (late, at risk, waiting, resolved, closed by both auto-close rules, reopened, a child of a closed ticket).
 
 ## Demo accounts
 
-Password for **all 11 accounts**: `riFIiI0eLCFQ6yqYfh_OQIhF`
-(A demo-only credential for this evaluation, D-044; a real deployment would force a password change.)
+Roles available: **2 support leads** and **9 agents**.
 
-| Role | Emails |
-|---|---|
-| Leads (2) | `meera@arvo.example`, `rohini@arvo.example` |
-| Agents (9) | `priya@arvo.example`, `arjun@arvo.example`, `kavya@arvo.example`, `rahul@arvo.example`, `ananya@arvo.example`, `vikram@arvo.example`, `sneha@arvo.example`, `karthik@arvo.example`, `divya@arvo.example` |
+**Credentials are provided in the submission form** — they are not published here (D-047).
 
-**5 wrong passwords lock an account for 15 minutes** (D-029). The emails are public, so anyone can lock one — if a login fails with the right password, use another account. That is why there are two leads.
+**5 wrong passwords lock an account for 15 minutes** (D-029). If a login fails with the right password, use another account of the same role; that is why there are two leads.
 
-Customers have no accounts: submit a problem at [/new](https://frontdesk-qtlh.onrender.com/new) to get your private link.
+The customer side needs no login: use [/new](https://frontdesk-qtlh.onrender.com/new) to submit a problem and get your private link.
 
 ## Rules I extracted from the story
 
@@ -136,7 +132,7 @@ cd backend
 uv run uvicorn app.main:app
 ```
 
-Open http://localhost:8000 and log in with any [demo email](#demo-accounts) and the password you gave the seed (`local-demo-password` above). Locally the seed also prints a customer link for each demo ticket.
+Open http://localhost:8000 and log in with any account from `LEADS` / `AGENTS` in [backend/scripts/seed.py](backend/scripts/seed.py) (the seed also prints the lead emails) and the password you gave the seed (`local-demo-password` above). Locally the seed also prints a customer link for each demo ticket.
 
 - The seed refuses to run twice (it needs an empty tickets table). To start over: `docker compose down -v` (deletes the local database volume), then repeat from step 2.
 - Swagger UI is at http://localhost:8000/docs in development.
@@ -172,6 +168,6 @@ CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the same on every
 
 ## How it was built
 
-- Requirements and design first: the story was turned into rules with IDs ([PRD](docs/PRD.md)) and 46 logged decisions ([DECISIONS](docs/DECISIONS.md)), made by me with Claude (claude.ai) as architect and reviewer. Where the story was unclear I decided and wrote down why.
+- Requirements and design first: the story was turned into rules with IDs ([PRD](docs/PRD.md)) and 47 logged decisions ([DECISIONS](docs/DECISIONS.md)), made by me with Claude (claude.ai) as architect and reviewer. Where the story was unclear I decided and wrote down why.
 - Code was generated with Claude Code from those specs, sprint by sprint, and I reviewed every sprint against a gate (lint, tests, dependency audit, security checklist) before moving on.
 - Real times, including the slow parts, are in [docs/TIMELOG.md](docs/TIMELOG.md).

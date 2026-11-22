@@ -45,6 +45,7 @@ All tests run with `uv run pytest`. Integration tests use real PostgreSQL 16 (do
 | I-13 | Non-GET agent request without `X-Requested-With` | 403 |
 | I-14 | Customer token for ticket A cannot read ticket B | 404 |
 | I-15 | Render proxy format (`TRUSTED_PROXY_HOPS=3`): 7 failed logins with different forged leftmost `X-Forwarded-For` values and a changing Cloudflare edge: 6th and 7th are 429 and every audit event carries the real client IP; with hops=0 the header is ignored everywhere (D-045, D-046) | 429 + real IP |
+| I-16 | `scripts/rotate_demo_password.py` on a throwaway DB (D-047): weak password refused; refused unless the @arvo.example accounts are exactly the 11 seeded ones (nothing changed); otherwise all 11 re-hashed with fresh salts (old password fails, new works), failed counts/locks reset, every open session revoked, 11 `password_rotated` events (actor system, payload `{agent_id}` only, one DB `now`), verify ok; `.env.neon` → frontdesk_app URL | as described |
 
 ## Client IP (`tests/unit/test_client_ip.py`, D-045, D-046)
 | ID | Case |

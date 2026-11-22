@@ -48,6 +48,7 @@ frontdesk/
       jobs/sweep.py         auto-close (WAIT-4, RO-3) + the lifespan loop (sweep_once / sweep_loop)
     scripts/seed.py         demo data through the domain functions (`uv run python -m scripts.seed`)
     scripts/export_openapi.py  OpenAPI JSON to stdout (frontend contract, `npm run gen:api`)
+    scripts/rotate_demo_password.py  rotate the 11 demo accounts' password + revoke sessions, audited (D-047)
     tests/unit/  tests/integration/  tests/architecture/
                             integration/api_support.py: API test harness (frozen DB time, direct sessions)
   frontend/                 Vite React TS Tailwind TanStack Query
@@ -122,7 +123,7 @@ At the start of each request transaction the app runs `SELECT now()` and uses th
   3. canonical = JSON of {ticket_id, actor_type, actor_id, event_type, payload, created_at ISO-8601 UTC with microseconds}, `sort_keys=True, separators=(",", ":")`
   4. `hash = sha256(prev_hash + canonical_bytes)`; insert row with `created_at = now`.
 - `verify(session) -> {ok: bool, checked: int, first_bad_id: int|None}` recomputes in id order.
-- Event types: ticket_created, claimed, released, assigned, customer_message, agent_reply, note_added, status_changed, priority_changed, resolved, reopened, auto_closed (actor system from the sweep, or customer when a write after the reopen window closes the ticket, D-041), holiday_added, holiday_removed, login_succeeded, login_failed, account_locked.
+- Event types: ticket_created, claimed, released, assigned, customer_message, agent_reply, note_added, status_changed, priority_changed, resolved, reopened, auto_closed (actor system from the sweep, or customer when a write after the reopen window closes the ticket, D-041), holiday_added, holiday_removed, login_succeeded, login_failed, account_locked, password_rotated (actor system, payload `{agent_id}` only — `scripts/rotate_demo_password.py`, D-047).
 - Payloads never contain note bodies (LEAK-3). Message events contain message_id only.
 
 ## 9. Background sweep (`app/jobs/sweep.py`)
