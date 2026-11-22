@@ -37,7 +37,7 @@ Login 5/min/IP · customer 30/min/IP and public 30/min/IP (separate buckets, D-0
 ## 7. Known limitations (be honest in COMPLETION_NOTE.md)
 - Hash chain is tamper-evident, not tamper-proof: a DB superuser could rewrite the whole chain. Next step: publish the head hash outside the DB periodically.
 - In-memory rate limits reset on restart.
-- IP addresses written to the immutable audit log (login events, D-031) cannot be erased later, e.g. on a data-deletion request. Kept deliberately for attack investigation; emails are never stored there (actor_id or HMAC only).
+- IP addresses in the immutable audit log cannot be erased — accepted for security forensics; production would add a retention design. (Login events, D-031; emails are never stored there — actor_id or HMAC only.)
 - Demo credentials are published in README for evaluators; a real deployment would force password change.
 - `--forwarded-allow-ips='*'` relies on Render's proxy being the only ingress.
 - No email delivery, so "reply sent" means "recorded in Frontdesk".

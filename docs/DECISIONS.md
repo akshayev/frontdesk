@@ -109,6 +109,13 @@ Targets (working min): urgent 120/540 · medium 270/1620 · low 540/2700. Calend
 - Implementation notes: a full Argon2 verification runs on every path (dummy hash for unknown emails) so timing is equal too; attempts while locked are audited as login_failed (reason "locked") and do not extend the lock; the failure count resets only on success (SECURITY §2). The 401 is returned, not raised, so the request transaction commits the counter and the audit events.
 - Rejected: 423 for locked accounts (tells an attacker the email exists and that guessing is working).
 
+## D-030 · S3 · Responsive UI, mobile-first on every screen (approved by owner, Sprint 3; implemented in S4)
+- Customer pages are phone-first (links arrive via WhatsApp). Agent/lead pages are desktop-first but fully usable on phones.
+- Reply vs note: distinct colours (blue = reply to customer, yellow = internal note) AND distinct button labels on every screen size; note mode is never hidden in a menu.
+- Rules: no horizontal scroll at 360 px; tap targets ≥ 44 px; inputs ≥ 16 px (no iOS zoom); badges use colour + text; the composer stays visible with the on-screen keyboard open.
+- Verification: manual DevTools check at 360×800, 768×1024, 1440×900, plus a real phone after deploy.
+- Why: customers open the secret link from WhatsApp on a phone; agents sometimes answer from a phone. INC-0304 shows what happens when the two composers look alike.
+
 ## D-031 · S2 · Login audit events never store the typed email (approved by owner, Sprint 2; refines D-029)
 - Known account → record actor_id (the agent's id) and no email. Unknown email → record a keyed hash, HMAC-SHA256 with SESSION_SECRET of the lower-cased email (`email_hmac`), never the raw text. The client IP is kept (needed to investigate attacks).
 - Why: people often type their password into the email field; the audit log is insert-only by design (D-015), so anything written there is kept forever and can never be corrected or erased. The DPDP Act expects personal data to be kept only as long as needed, which an undeletable log cannot honour. The keyed hash still shows repeated attacks on the same address, while a mistyped password is unreadable. A plain (unkeyed) hash would be reversible by guessing common emails/passwords.
