@@ -7,6 +7,7 @@ import { EmptyState, PageSkeleton } from '../../../components/ui/Card'
 import { ErrorState } from '../../../components/ui/ErrorState'
 import { Tabs } from '../../../components/ui/Tabs'
 import { VIEWS } from '../../../lib/labels'
+import { usePageTitle } from '../../../lib/usePageTitle'
 import { NewTicketDialog } from '../components/NewTicketDialog'
 import { TicketCards, TicketTable } from '../components/TicketList'
 import { useTickets } from '../queries'
@@ -28,6 +29,7 @@ export default function TicketsPage() {
   const raw = params.get('view')
   const view: View = isView(raw) ? raw : 'mine'
   const tickets = useTickets(view)
+  usePageTitle(`Tickets · ${VIEWS.find((v) => v.id === view)?.label ?? ''}`)
   const [creating, setCreating] = useState(false)
 
   return (

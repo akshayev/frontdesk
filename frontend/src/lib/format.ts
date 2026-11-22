@@ -12,42 +12,49 @@ export function formatWorkingMinutes(minutes: number): string {
   return `${hours}h ${rest}m`
 }
 
-const shortFmt = new Intl.DateTimeFormat('en-GB', {
-  timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit',
-  minute: '2-digit', hourCycle: 'h23',
-})
-const exactFmt = new Intl.DateTimeFormat('en-GB', {
-  timeZone: TZ, day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit',
-  minute: '2-digit', second: '2-digit', hourCycle: 'h23',
-})
-const dateFmt = new Intl.DateTimeFormat('en-GB', {
+// One parts formatter; strings are composed by hand so the punctuation is the same in every
+// browser and in Node (ICU versions differ on commas).
+const partsFmt = new Intl.DateTimeFormat('en-GB', {
   timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+  hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
 })
 const numberFmt = new Intl.NumberFormat('en-IN')
 
-function toDate(value: string | Date): Date {
-  return typeof value === 'string' ? new Date(value) : value
+type Parts = Record<'weekday' | 'day' | 'month' | 'year' | 'hour' | 'minute' | 'second', string>
+
+function parts(value: string | Date): Parts {
+  const date = typeof value === 'string' ? new Date(value) : value
+  const out: Parts = { weekday: '', day: '', month: '', year: '', hour: '', minute: '',
+    second: '' }
+  for (const part of partsFmt.formatToParts(date)) {
+    if (part.type in out) out[part.type as keyof Parts] = part.value
+  }
+  return out
 }
 
-/** "Mon, 23 Nov, 11:00 IST" — lists, SLA panel, timeline. */
+/** "Mon, 23 Nov, 11:00 IST" — lists, SLA panel. */
 export function formatIST(value: string | Date): string {
-  return `${shortFmt.format(toDate(value))} IST`
+  const p = parts(value)
+  return `${p.weekday}, ${p.day} ${p.month}, ${p.hour}:${p.minute} IST`
 }
 
-/** "23 Nov 2026, 11:00:05 IST" — exact time (customer thread, AUD-4). */
+/** "23 Nov 2026, 11:00:05 IST" — exact time (conversation, timeline, AUD-4). */
 export function formatISTExact(value: string | Date): string {
-  return `${exactFmt.format(toDate(value))} IST`
+  const p = parts(value)
+  return `${p.day} ${p.month} ${p.year}, ${p.hour}:${p.minute}:${p.second} IST`
 }
 
 /** "Mon, 23 Nov 2026" — a calendar date in IST. */
 export function formatISTDate(value: string | Date): string {
-  return dateFmt.format(toDate(value))
+  const p = parts(value)
+  return `${p.weekday}, ${p.day} ${p.month} ${p.year}`
 }
 
 /** A holiday's calendar date ("2026-12-25") without any time-zone shift. */
 export function formatCalendarDate(isoDate: string): string {
   const [y, m, d] = isoDate.split('-').map(Number)
-  return dateFmt.format(new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1, 12)))
+  // Noon UTC is the same calendar day in IST (UTC+05:30).
+  return formatISTDate(new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1, 12)))
 }
 
 export function formatCount(value: number): string {

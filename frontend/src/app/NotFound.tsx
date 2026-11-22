@@ -1,7 +1,9 @@
 import { Link } from 'react-router'
 import { buttonClass } from '../components/ui/buttonClass'
+import { usePageTitle } from '../lib/usePageTitle'
 
 export default function NotFound() {
+  usePageTitle('Page not found')
   return (
     <main className="mx-auto grid min-h-dvh max-w-md place-items-center p-6 text-center">
       <div>

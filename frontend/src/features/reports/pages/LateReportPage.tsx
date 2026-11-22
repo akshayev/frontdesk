@@ -10,6 +10,7 @@ import { CheckIcon, AlertIcon, DownloadIcon, ShieldIcon } from '../../../compone
 import { targetLabel } from '../../../lib/badge'
 import { formatCount, formatIST, formatWorkingMinutes, ticketNumber } from '../../../lib/format'
 import { PRIORITY_LABEL } from '../../../lib/labels'
+import { usePageTitle } from '../../../lib/usePageTitle'
 import { LATE_CSV_URL, useAuditVerify, useLateReport } from '../queries'
 
 function Missed({ row }: { row: LateRow }) {
@@ -90,6 +91,7 @@ function VerifyPanel() {
 
 export default function LateReportPage() {
   const report = useLateReport()
+  usePageTitle('Late tickets')
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">

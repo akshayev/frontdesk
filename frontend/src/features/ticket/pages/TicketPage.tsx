@@ -7,6 +7,7 @@ import { PriorityBadge, SlaBadge, StatusPill } from '../../../components/ui/Badg
 import { PageSkeleton } from '../../../components/ui/Card'
 import { ErrorState } from '../../../components/ui/ErrorState'
 import { ticketNumber } from '../../../lib/format'
+import { usePageTitle } from '../../../lib/usePageTitle'
 import { ActionsPanel } from '../components/Actions'
 import { Composer } from '../components/Composer'
 import { Conversation } from '../components/Conversation'
@@ -16,6 +17,7 @@ import { useTicket } from '../queries'
 export default function TicketPage() {
   const { id = '' } = useParams()
   const query = useTicket(id)
+  usePageTitle(query.data ? `${ticketNumber(query.data.ticket.number)} ${query.data.ticket.subject}` : 'Ticket')
 
   if (query.isPending) return <PageSkeleton rows={6} />
   if (query.isError) {

@@ -6,12 +6,14 @@ import { isApiError } from '../../../api/errors'
 import { Button } from '../../../components/ui/Button'
 import { TextField } from '../../../components/ui/Field'
 import { AlertIcon } from '../../../components/ui/Icon'
+import { usePageTitle } from '../../../lib/usePageTitle'
 import { safeNext, useLogin } from '../queries'
 
 export default function LoginPage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const login = useLogin()
+  usePageTitle('Sign in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
@@ -32,9 +34,9 @@ export default function LoginPage() {
       <div className="hidden flex-col justify-between p-10 text-white md:flex">
         <p className="font-semibold">Frontdesk <span className="text-white/60">· Arvo Systems</span></p>
         <div>
-          <h1 className="max-w-md text-4xl font-semibold leading-tight text-white">
+          <p className="max-w-md text-4xl font-semibold leading-tight text-white">
             Every customer answered on time.
-          </h1>
+          </p>
           <p className="mt-4 max-w-md text-white/75">
             Shared support inbox with working-hours SLAs, internal notes that never leak, and a
             history you can prove.
@@ -47,7 +49,7 @@ export default function LoginPage() {
           <p className="mb-6 font-semibold text-navy-900 md:hidden">
             Frontdesk <span className="font-normal text-ink">· Arvo Systems</span>
           </p>
-          <h2 className="text-2xl font-semibold">Sign in</h2>
+          <h1 className="text-2xl font-semibold">Sign in</h1>
           <p className="mt-1 text-sm">For Arvo support agents and the support lead.</p>
           <form className="mt-6 space-y-4" onSubmit={onSubmit} noValidate>
             <TextField label="Email" type="email" autoComplete="username" required

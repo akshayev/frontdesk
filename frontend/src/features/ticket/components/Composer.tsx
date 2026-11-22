@@ -92,23 +92,25 @@ export function Composer({ ticketId, version, customerName, canReply, canWait }:
       <div className="flex flex-wrap gap-2">
         {canReply && (
           <button type="button" onClick={() => open('reply')} aria-pressed={effectiveMode === 'reply'}
+            aria-keyshortcuts="R"
             className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold
               ring-2 ring-inset transition-colors ${effectiveMode === 'reply'
                 ? 'bg-brand-600 text-white ring-brand-600'
                 : 'bg-white text-brand-700 ring-brand-600 hover:bg-brand-50'}`}>
             <SendIcon className="size-4" /> Reply to customer
-            <kbd className="hidden rounded border border-current px-1 text-[10px] opacity-70
-              lg:inline">R</kbd>
+            <kbd aria-hidden="true" className="hidden rounded border border-current px-1
+              text-[10px] opacity-70 lg:inline">R</kbd>
           </button>
         )}
         <button type="button" onClick={() => open('note')} aria-pressed={isNote}
+          aria-keyshortcuts="N"
           className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold
             ring-2 ring-inset ring-amber-500 transition-colors ${isNote
               ? 'bg-amber-300 text-amber-950'
               : 'bg-amber-50 text-amber-900 hover:bg-amber-100'}`}>
           <LockIcon className="size-4" /> Add internal note
-          <kbd className="hidden rounded border border-current px-1 text-[10px] opacity-70
-            lg:inline">N</kbd>
+          <kbd aria-hidden="true" className="hidden rounded border border-current px-1
+            text-[10px] opacity-70 lg:inline">N</kbd>
         </button>
       </div>
       {!canReply && (

@@ -68,3 +68,12 @@ The CSP is the same on every path. Swagger UI (`/docs`) is served in development
 - [x] pip-audit / npm audit clean — "No known vulnerabilities found" / "found 0 vulnerabilities".
 - [x] No raw SQL built with string formatting — all new SQL is SQLAlchemy constructs; the only `text()` calls are constant strings (`SELECT now()`) and test fixtures with bound parameters.
 - [x] CSV exports (transcript, late report) prefix cells starting with = + - @ tab CR with `'` (formula injection); tested.
+
+### Sprint 4 review (22 Nov 2026)
+- [x] No secrets in diff — `git diff d8d097c | grep -iE "password|secret|key|token"` reviewed: only identifiers, docstrings, decision text and test fixtures (a fake `secret.txt` for the path-traversal test). Local smoke runs used a throwaway seed password kept outside the repo. secret-guard scan clean before every commit.
+- [x] Every new endpoint has an auth dependency and a rate-limit group — no new API endpoint. The SPA catch-all (`app/spa.py`) serves only files from the build directory (no data, no auth needed, traversal-safe, tests S-1..S-4); it never answers `/api/*`, `/healthz/*` or `/openapi.json/*` (JSON 404). Static files have no rate-limit group (nothing to protect; noted).
+- [x] Every new customer-facing schema checked: no note fields — no schema change. The customer page renders only `CustomerTicketOut` fields; the agent ticket page never shows the customer link or token.
+- [x] Every mutation goes through domain layer (version check + audit event) — no backend mutation added; every UI mutation sends `expected_version` and uses the server's answer (no optimistic updates, D-037); actions are rendered only from `allowed_actions`.
+- [x] pip-audit / npm audit clean — "No known vulnerabilities found"; `npm audit --omit=dev` and full `npm audit`: "found 0 vulnerabilities".
+- [x] No raw SQL built with string formatting — no new SQL.
+- [x] Frontend (D-037, D-038): CSP unchanged and verified in headless Chrome on every screen (no violations, no console errors); no inline `style` props and no `dangerouslySetInnerHTML` (both enforced by oxlint rules); fonts bundled, `assetsInlineLimit: 0` (no `data:` URIs), no third-party origins; message bodies rendered as text (`whitespace-pre-wrap`); `X-Requested-With: frontdesk` on every non-GET (F-2); customer token only in the fragment and the `X-Ticket-Token` header, query keys hold a hash of it; `/login?next=` accepts same-site paths only (no open redirect); `<meta name="referrer" content="no-referrer">` in addition to the header.

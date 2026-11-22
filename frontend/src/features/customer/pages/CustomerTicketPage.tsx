@@ -17,6 +17,7 @@ import { AlertIcon, SendIcon } from '../../../components/ui/Icon'
 import { CopyButton, SecretLink } from '../../../components/ui/SecretLink'
 import { formatISTExact, ticketNumber } from '../../../lib/format'
 import { customerStatusLabel } from '../../../lib/labels'
+import { usePageTitle } from '../../../lib/usePageTitle'
 import { CustomerShell } from '../components/CustomerShell'
 import { readToken, useCustomerReply, useCustomerTicket, useReopen } from '../queries'
 
@@ -29,6 +30,7 @@ const STATUS_TONE: Record<CustomerTicket['status'], string> = {
 }
 
 function InvalidLink() {
+  usePageTitle('This link is not valid', 'Arvo Systems support')
   return (
     <CustomerShell>
       <div className="rounded-2xl bg-white p-6 text-center shadow-sm ring-1 ring-slate-200">
@@ -133,6 +135,8 @@ function TicketView({ token }: { token: string }) {
   const query = useCustomerTicket(token)
   const reopen = useReopen(token)
   const [followUp, setFollowUp] = useState<CustomerWrite | null>(null)
+  usePageTitle(query.data ? `Your request ${ticketNumber(query.data.number)}` : 'Your request',
+    'Arvo Systems support')
 
   if (query.isPending) return <CustomerShell><PageSkeleton rows={4} /></CustomerShell>
   if (query.isError) {

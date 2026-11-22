@@ -8,10 +8,12 @@ import { Dialog } from '../../../components/ui/Dialog'
 import { ErrorState, InlineError } from '../../../components/ui/ErrorState'
 import { TextField } from '../../../components/ui/Field'
 import { formatCalendarDate } from '../../../lib/format'
+import { usePageTitle } from '../../../lib/usePageTitle'
 import { useAddHoliday, useHolidays, useRemoveHoliday } from '../queries'
 
 export default function HolidaysPage() {
   const holidays = useHolidays()
+  usePageTitle('Holidays')
   const add = useAddHoliday()
   const remove = useRemoveHoliday()
   const [date, setDate] = useState('')

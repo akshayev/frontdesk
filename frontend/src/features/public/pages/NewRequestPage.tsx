@@ -9,6 +9,7 @@ import { TextArea, TextField } from '../../../components/ui/Field'
 import { AlertIcon, CheckIcon } from '../../../components/ui/Icon'
 import { SecretLink } from '../../../components/ui/SecretLink'
 import { ticketNumber } from '../../../lib/format'
+import { usePageTitle } from '../../../lib/usePageTitle'
 import { CustomerShell } from '../../customer/components/CustomerShell'
 import { useSubmitRequest } from '../queries'
 
@@ -29,6 +30,7 @@ export default function NewRequestPage() {
   const [priority, setPriority] = useState<Priority | null>(null)
   const [created, setCreated] = useState<PublicTicketCreated | null>(null)
   const severityId = useId()
+  usePageTitle(created ? 'Request received' : 'Submit a problem', 'Arvo Systems support')
 
   const set = (key: keyof typeof EMPTY) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [key]: e.target.value }))
