@@ -7,13 +7,16 @@ ticket is simply handled by the next run. SLA badges never depend on the sweep (
 read time).
 """
 
+import asyncio
+import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
-from app.db import RequestContext
+from app.db import RequestContext, load_holidays, request_transaction
 from app.domain.tickets import auto_close
 from app.models import CloseReason, Ticket, TicketStatus
 from app.sla import policy
@@ -56,3 +59,36 @@ def run_sweep(session: Session, now: datetime, holidays: Holidays) -> SweepResul
             auto_close(ctx, ticket, CloseReason.reopen_window_expired)
             expired += 1
     return SweepResult(no_customer_reply=silent, reopen_window_expired=expired)
+
+
+# --- background loop (lifespan) --------------------------------------------------------------
+
+SWEEP_INTERVAL_S = 300  # ARCHITECTURE §9: every 5 minutes, and once at startup
+logger = logging.getLogger("frontdesk.sweep")
+
+
+def sweep_once(factory: sessionmaker[Session]) -> SweepResult | None:
+    """One sweep in its own request-style transaction (DB now, D-021). Errors are logged and
+    swallowed so the loop keeps running; the transaction is rolled back."""
+    try:
+        with request_transaction(factory) as ctx:
+            result = run_sweep(ctx.session, ctx.now, load_holidays(ctx.session))
+    except Exception:
+        logger.exception("sweep failed; will retry in %s s", SWEEP_INTERVAL_S)
+        return None
+    if result.no_customer_reply or result.reopen_window_expired:
+        logger.info("sweep closed tickets: no_customer_reply=%d reopen_window_expired=%d",
+                    result.no_customer_reply, result.reopen_window_expired)
+    return result
+
+
+async def sweep_loop(factory_of: Callable[[], sessionmaker[Session]],
+                     interval_s: float = SWEEP_INTERVAL_S) -> None:
+    """Run sweep_once now and then every `interval_s` seconds, in a worker thread (the DB code
+    is synchronous). Cancelled by the lifespan on shutdown."""
+    while True:
+        try:
+            await asyncio.to_thread(sweep_once, factory_of())
+        except Exception:  # e.g. DATABASE_URL missing: keep the app up, log and retry
+            logger.exception("sweep could not start; will retry in %s s", interval_s)
+        await asyncio.sleep(interval_s)
