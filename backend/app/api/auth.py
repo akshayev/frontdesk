@@ -5,8 +5,9 @@ from fastapi.responses import JSONResponse
 
 from app.db import Tx
 from app.schemas.agent import AgentOut, LoginIn
+from app.security.client_ip import client_ip
 from app.security.headers import error_response
-from app.security.ratelimit import client_ip, limit_agent, limit_login
+from app.security.ratelimit import limit_agent, limit_login
 from app.security.sessions import (
     GENERIC_LOGIN_MESSAGE,
     CurrentAgent,

@@ -174,6 +174,9 @@ Least privilege in production: the web service only receives the frontdesk_app D
 ## D-044 · S5 · Two demo lead accounts (approved by owner, Sprint 5)
 Two demo lead accounts (Meera + a second lead) because the public README lists demo emails and lockout (D-029) can be abused to lock an account; one locked lead cannot block evaluation. SECURITY §7: lockout can be abused for denial of service; production would add CAPTCHA / per-IP+account throttling.
 
+## D-045 · S5 · Client IP is the rightmost X-Forwarded-For entry behind the trusted proxy (approved by owner, Sprint 5; replaces the `--forwarded-allow-ips='*'` assumption in ARCHITECTURE §12 / SECURITY §7)
+Client IP = the RIGHTMOST entry of X-Forwarded-For when TRUSTED_PROXY_HOPS=1 (production, behind Render's proxy); the socket peer address when TRUSTED_PROXY_HOPS=0 (development/tests). Clients can prepend fake values but cannot control what the trusted proxy appends. Found by a live spoofing test at 13:15 IST: with --forwarded-allow-ips='*' the leftmost client-supplied value was trusted, bypassing per-IP rate limits and writing forged IPs into the audit log. Rejected: trusting the leftmost value (spoofable); hard-coding Render proxy IP ranges (undocumented, can change).
+
 ---
 
 ## Incident → design map (interview)

@@ -43,9 +43,11 @@ def _fresh_rate_limits() -> Iterator[None]:
     limiter.reset()
 
 
-def _app(auth_db: tuple[Engine, Engine], production: bool = False) -> FastAPI:
+def _app(auth_db: tuple[Engine, Engine], production: bool = False,
+         hops: int = 0) -> FastAPI:
     settings = get_settings().model_copy(
-        update={"app_env": "production" if production else "development"}
+        update={"app_env": "production" if production else "development",
+                "trusted_proxy_hops": hops}
     )
     app = create_app(settings=settings, engine=auth_db[1])
 
@@ -374,3 +376,28 @@ def test_d031_login_audit_never_stores_the_typed_email(
         needle = typed.strip().lower().split("@")[0]
         dump = s.execute(text("SELECT string_agg(payload::text, ' ') FROM audit_events")).scalar()
         assert needle not in dump.lower()  # nowhere in the whole log, in any case
+
+
+def test_rate_limit_and_audit_ip_use_the_rightmost_forwarded_ip(
+        auth_db: tuple[Engine, Engine]) -> None:
+    """D-045, live-test regression: faking X-Forwarded-For must not bypass the 5/min login limit
+    nor put forged IPs in the audit log (behind one trusted proxy, hops=1)."""
+    client = TestClient(_app(auth_db, production=True, hops=1))
+    email = _agent(auth_db)
+    codes = [client.post("/api/auth/login", json={"email": email, "password": "wrong-password"},
+                         headers={**CSRF, "X-Forwarded-For": f"203.0.113.{n}, 198.51.100.9"}
+                         ).status_code for n in range(1, 8)]
+    assert codes == [401] * 5 + [429] * 2
+    ips = {p["ip"] for _, p in _events(auth_db, email)}
+    assert ips == {"198.51.100.9"}  # the proxy-appended address, never the forged ones
+
+
+def test_without_trusted_proxy_the_header_is_ignored_everywhere(
+        auth_db: tuple[Engine, Engine]) -> None:
+    client = TestClient(_app(auth_db))  # hops=0
+    email = _agent(auth_db)
+    codes = [client.post("/api/auth/login", json={"email": email, "password": "wrong-password"},
+                         headers={**CSRF, "X-Forwarded-For": f"203.0.113.{n}"}).status_code
+             for n in range(1, 8)]
+    assert codes == [401] * 5 + [429] * 2
+    assert {p["ip"] for _, p in _events(auth_db, email)} == {"testclient"}

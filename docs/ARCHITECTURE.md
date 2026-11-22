@@ -39,7 +39,7 @@ frontdesk/
       domain/reports.py     lead late report (RPT-1) built from ticket rows + audit events only
       domain/holidays.py    lead holiday list/add/remove (audited)
       audit/chain.py        append_event(), canonical JSON, hash, verify()
-      security/             passwords.py sessions.py csrf.py ratelimit.py headers.py customer_token.py
+      security/             passwords.py sessions.py csrf.py ratelimit.py headers.py customer_token.py client_ip.py (D-045)
       api/auth.py api/agent.py api/lead.py api/customer.py api/public.py api/health.py (/healthz itself is defined in main.py)
       api/errors.py         DomainError → standard error JSON
       api/csv_export.py     CSV responses with the formula-injection guard (transcript, late report)
@@ -143,7 +143,8 @@ Errors: JSON `{error: code, message, request_id}`; codes include `stale_version`
 Serving (`app/spa.py`): API routes win; unknown `/api/*` → JSON 404 for every method (a known API path with the wrong method → 405 + `Allow`); `/assets/*` → `Cache-Control: public, max-age=31536000, immutable`; any other GET → `index.html` with `no-cache`; HEAD is answered like GET without a body (uptime monitors), also on `/healthz`; `/docs` and `/redoc` → JSON 404 when Swagger is off (production, D-035). The CSP is the same as on every response.
 
 ## 12. Deployment
-Dockerfile stage 1 `node:24-slim` builds `frontend/dist`; stage 2 `python:3.12-slim` installs the backend with uv (`uv sync --frozen --no-dev`), copies dist to `app/static`, runs as a non-root user and starts only `uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'`. `'*'` is acceptable only because Render's proxy is the sole ingress to the container (SECURITY §7).
+Dockerfile stage 1 `node:24-slim` builds `frontend/dist`; stage 2 `python:3.12-slim` installs the backend with uv (`uv sync --frozen --no-dev`), copies dist to `app/static`, runs as a non-root user and starts only `uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}` — no `--proxy-headers` / `--forwarded-allow-ips`, so uvicorn never rewrites the client address (D-045).
 **The container never migrates (D-043).** `alembic upgrade head` and `scripts/seed.py` run from the developer machine with the Neon owner role (`.env.neon`); the web service only has the `frontdesk_app` URL, so a compromised web server cannot disable the audit triggers or change grants.
-Env on Render (web service, `render.yaml`): `DATABASE_URL` (frontdesk_app role, Neon direct host, `sslmode=require`), `SESSION_SECRET`, `PUBLIC_BASE_URL` (all `sync: false`, entered in the dashboard), `APP_ENV=production`, `SWEEP_ENABLED=true`.
+Env on Render (web service, `render.yaml`): `DATABASE_URL` (frontdesk_app role, Neon direct host, `sslmode=require`), `SESSION_SECRET`, `PUBLIC_BASE_URL` (all `sync: false`, entered in the dashboard), `APP_ENV=production`, `SWEEP_ENABLED=true`, `TRUSTED_PROXY_HOPS=1`.
+**Client IP (D-045).** `app/security/client_ip.py` is the only code that reads `X-Forwarded-For`; it feeds every rate-limit key and the IP in audit events. `TRUSTED_PROXY_HOPS=1` (Render): the rightmost entry, which the trusted proxy appends and a client cannot forge; `0` (default; development, tests): the socket peer, header ignored. A missing or malformed header falls back to the peer, never to a client-supplied value.
 Developer machine only: `MIGRATION_DATABASE_URL` (owner), `APP_DB_PASSWORD` (used by migration 0003 to create the app role), `SEED_DEMO_PASSWORD`.

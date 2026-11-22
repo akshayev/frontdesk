@@ -44,6 +44,14 @@ All tests run with `uv run pytest`. Integration tests use real PostgreSQL 16 (do
 | I-12 | Login lockout after 5 failures; audited | locked (correct password then refused with the same generic 401 as any failure, D-029); login_failed + account_locked events present |
 | I-13 | Non-GET agent request without `X-Requested-With` | 403 |
 | I-14 | Customer token for ticket A cannot read ticket B | 404 |
+| I-15 | Behind one trusted proxy (`TRUSTED_PROXY_HOPS=1`) 7 failed logins with different forged leftmost `X-Forwarded-For` values: 6th and 7th are 429 and every audit event carries the proxy-appended IP; with hops=0 the header is ignored everywhere (D-045) | 429 + real IP |
+
+## Client IP (`tests/unit/test_client_ip.py`, D-045)
+| ID | Case |
+|---|---|
+| C-1 | Spoofed leftmost entries ignored with hops=1; single entry; whitespace stripped; several header lines = one list; hops=2 |
+| C-2 | hops=0 ignores the header entirely; default setting is 0; negative hops rejected |
+| C-3 | Missing, short or malformed header (garbage, empty, `ip:port`, out-of-range) → socket peer; IPv6 accepted and canonicalised |
 
 ## Architecture (`tests/architecture/`)
 | ID | Case |

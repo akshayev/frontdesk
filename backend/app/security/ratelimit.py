@@ -1,7 +1,7 @@
 """slowapi rate-limit groups. Implements: SECURITY §4, D-016, D-032.
 
-In-memory, single process (limitation in SECURITY §7). Decorate every endpoint with exactly
-one group; the endpoint must take `request: Request`.
+In-memory, single process (limitation in SECURITY §7). Client IP: app.security.client_ip
+(D-045). Decorate every endpoint with exactly one group; the endpoint must take `request: Request`.
 - limit_login     5/min per client IP                    (POST /api/auth/login)
 - limit_customer  30/min per client IP, shared scope     (/api/customer/*)
 - limit_public    30/min per client IP, shared scope     (/api/public/*)
@@ -17,8 +17,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
+from app.security.client_ip import client_ip
 from app.security.headers import error_response
 from app.security.sessions import COOKIE_NAME
 
@@ -26,11 +26,6 @@ LOGIN_LIMIT = "5/minute"
 CUSTOMER_LIMIT = "30/minute"
 PUBLIC_LIMIT = "30/minute"
 AGENT_LIMIT = "120/minute"
-
-
-def client_ip(request: Request) -> str:
-    """Client address (uvicorn --proxy-headers resolves X-Forwarded-For on Render, §12)."""
-    return get_remote_address(request)
 
 
 def session_key(request: Request) -> str:

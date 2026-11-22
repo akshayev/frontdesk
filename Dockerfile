@@ -35,7 +35,8 @@ RUN groupadd --system --gid 10001 frontdesk \
     && useradd --system --uid 10001 --gid frontdesk --no-create-home --shell /usr/sbin/nologin frontdesk
 USER frontdesk
 
-# Render sets $PORT; 8000 locally. Render's proxy is the only ingress (SECURITY §7), so the
-# forwarded headers it sets are trusted.
+# Render sets $PORT; 8000 locally. No --proxy-headers / --forwarded-allow-ips (D-045): uvicorn
+# must not rewrite the client address from X-Forwarded-For. app/security/client_ip.py reads the
+# header itself (rightmost entry, TRUSTED_PROXY_HOPS=1 on Render).
 EXPOSE 8000
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

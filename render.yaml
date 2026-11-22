@@ -17,6 +17,9 @@ services:
         value: production
       - key: SWEEP_ENABLED
         value: "true"
+      # D-045: Render's proxy is the one trusted hop; client IP = rightmost X-Forwarded-For.
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"
       # Secrets / per-deploy values: entered by hand in the Render dashboard.
       - key: DATABASE_URL
         sync: false

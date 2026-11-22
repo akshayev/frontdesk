@@ -23,7 +23,7 @@
 - Customer token scopes access to exactly one ticket.
 
 ## 4. Rate limits (slowapi, in-memory, single instance)
-Login 5/min/IP · customer 30/min/IP and public 30/min/IP (separate buckets, D-032) · agent API 120/min/session. Limitation: counters reset on restart and are per-instance (lockout is persistent in DB).
+Login 5/min/IP (client IP per D-045: rightmost X-Forwarded-For behind Render's proxy) · customer 30/min/IP and public 30/min/IP (separate buckets, D-032) · agent API 120/min/session. Limitation: counters reset on restart and are per-instance (lockout is persistent in DB).
 
 ## 5. Headers (middleware)
 `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'` · `X-Frame-Options: DENY` · `X-Content-Type-Options: nosniff` · `Referrer-Policy: no-referrer` · `Strict-Transport-Security: max-age=31536000` (production only).
@@ -41,7 +41,7 @@ The CSP is the same on every path. Swagger UI (`/docs`) is served in development
 - IP addresses in the immutable audit log cannot be erased — accepted for security forensics; production would add a retention design. (Login events, D-031; emails are never stored there — actor_id or HMAC only.)
 - Demo credentials are published in README for evaluators; a real deployment would force password change.
 - Lockout (D-029) can be abused for denial of service: anyone who knows a published demo email can lock that account for 15 minutes. Mitigation for the demo: two lead accounts (D-044). Production would add CAPTCHA / per-IP+account throttling.
-- `--forwarded-allow-ips='*'` (uvicorn trusts `X-Forwarded-For` / `-Proto` from any peer) relies on Render's proxy being the only ingress: a Render web service has no public port of its own, every request arrives through Render's TLS proxy, which sets those headers. On any host where the container port is reachable directly, this must become the proxy's address, otherwise clients could spoof their IP (rate limits, audit IPs) and the https scheme.
+- Client IP depends on exactly one trusted proxy hop (D-045): production sets `TRUSTED_PROXY_HOPS=1` and takes the rightmost `X-Forwarded-For` entry, which Render's proxy appends. Clients can prepend fake entries but cannot change that one. If the service were ever put behind a second proxy/CDN, `TRUSTED_PROXY_HOPS` must be raised, otherwise every client appears as the proxy. An earlier version trusted the header from any peer (`--forwarded-allow-ips='*'`) on the assumption that Render being the only ingress made that safe; the live test of 22 Nov 2026 showed it was not (the proxy keeps client-supplied entries), see D-045.
 - No email delivery, so "reply sent" means "recorded in Frontdesk".
 
 ## 8. Per-sprint security review checklist
@@ -87,3 +87,6 @@ The CSP is the same on every path. Swagger UI (`/docs`) is served in development
 - [x] pip-audit / npm audit clean — run locally and in CI on every push.
 - [x] No raw SQL built with string formatting — no new SQL.
 - [x] Deploy (D-043): the image has no secrets (`.dockerignore` excludes `.env*`, `*.local.md`, `.git`), runs as non-root uid 10001 with the code read-only, has no uv or build tools, and never migrates; Render receives only the app-role `DATABASE_URL` (Neon direct host, `sslmode=require`; client TLS verified), `SESSION_SECRET`, `PUBLIC_BASE_URL`. CI runs with `permissions: contents: read`. Lockout DoS noted in §7 (D-044).
+
+### Sprint 5 live test (22 Nov 2026) — finding and fix
+- [x] Live spoofing test against the deployed service: 7 logins with unknown email and different fake `X-Forwarded-For: 203.0.113.N` were all 401 (limit 5/min/IP) and Render's logs showed `203.0.113.N` as the client address. **Finding:** with `--forwarded-allow-ips='*'` the client-supplied leftmost value was trusted, so per-IP limits could be bypassed and forged IPs written to the audit log. **Fix (D-045):** uvicorn no longer rewrites the address; `app/security/client_ip.py` takes the rightmost entry with `TRUSTED_PROXY_HOPS=1`. Tests C-1..C-3, I-15. Forged-IP events from the test remain in the (insert-only) production audit log: 7 `login_failed` events with 203.0.113.N and the unknown-email HMAC.
