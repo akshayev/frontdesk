@@ -184,6 +184,10 @@ Targets (working min): urgent 120/540 · medium 270/1620 · low 540/2700. Calend
 - Why: D-018 kept the frontend at type-check + build. The composer is the INC-0304 surface and the client is the whole API contract — both worth a cheap, fast test. Browser E2E stays out of scope (PRD §12).
 - Rejected: Playwright E2E (time, PRD §12); Jest (second config next to Vite); no frontend tests (D-018 as it was).
 
+## D-042 · S4 · Frontend uses TypeScript 5.9.3, not 7.0.x (approved by owner, Sprint 4)
+- Frontend uses TypeScript 5.9.3, not 7.0.x — TS 7's native compiler has no JS compiler API, which openapi-typescript (and possibly other tooling) needs; one stable compiler for the whole app.
+- Rejected: separate codegen package with its own TS 5 (two compilers, extra lockfile).
+
 ---
 
 ## Incident → design map (interview)

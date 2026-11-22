@@ -1,1 +1,63 @@
 @import "tailwindcss";
+
+/* D-036 palette (iNav-aligned, no iNav branding) and D-033 status colours. */
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-brand-50: #eef0fb;
+  --color-brand-100: #dde0f6;
+  --color-brand-200: #b9bfec;
+  --color-brand-500: #4146c0;
+  --color-brand-600: #2a2e9f;
+  --color-brand-700: #22257f;
+  --color-brand-800: #1b1d63;
+
+  --color-navy-800: #252a5c;
+  --color-navy-900: #1a1e45;
+  --color-accent-700: #19326d;
+  --color-ink: #4d4d4d;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-slate-50 font-sans text-ink antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply text-navy-900;
+  }
+
+  /* Visible focus ring on every interactive element (keyboard users). */
+  :focus-visible {
+    outline: 3px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+
+  /* D-030: inputs ≥ 16px so iOS never zooms. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  dialog::backdrop {
+    background: rgb(26 30 69 / 0.55);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
