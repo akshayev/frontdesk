@@ -44,6 +44,16 @@ class AgentOut(BaseModel):
     role: AgentRole
 
 
+class AgentListItem(BaseModel):
+    """D-040: an agent in the lead's assign dialog — id, name, role only (no email)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    role: AgentRole
+
+
 class AgentRef(BaseModel):
     """An agent as shown next to a ticket, message or event."""
 

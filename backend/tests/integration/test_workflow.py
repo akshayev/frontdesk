@@ -377,3 +377,39 @@ def test_full_workflow_then_audit_verify_ok(api: ApiHarness) -> None:
             "reopened", "auto_closed", "holiday_added", "holiday_removed"} <= types
     assert TestClient(api.app).get("/api/lead/audit/verify").status_code == 401
     assert T0.tzinfo is UTC
+
+
+def test_d041_write_after_window_closes_old_ticket_in_same_transaction(api: ApiHarness) -> None:
+    """D-041: resolved past the 7-day window and the sweep has NOT run yet → the customer's
+    message creates the child ticket AND closes the old one in the same request: reason
+    reopen_window_expired, actor customer, child_ticket_id in the payload. The sweep then has
+    nothing left to do for it."""
+    agent = api.agent("Divya")
+    old_id, token = _in_state(api, agent, S.resolved)
+    old = api.ticket(old_id)
+    assert old.resolved_at is not None
+    api.clock.now = old.resolved_at + timedelta(days=7)  # exactly at the boundary (D-025)
+    out = api.customer(token).post("/api/customer/ticket/messages",
+                                   json={"body": "Same problem again"}).json()
+    child_id = api.ticket_id(out["new_ticket_number"])
+
+    closed = api.ticket(old_id)
+    assert (closed.status, closed.close_reason) == (S.closed, CloseReason.reopen_window_expired)
+    assert closed.closed_at == api.clock.now
+    assert closed.version == old.version + 1
+    assert api.ticket(child_id).parent_ticket_id == old_id
+    with Session(api.owner) as s:
+        rows = s.scalars(select(AuditEvent).where(AuditEvent.ticket_id == old_id)
+                         .order_by(AuditEvent.id)).all()
+    closing, status = rows[-2], rows[-1]
+    assert closing.event_type == "auto_closed"
+    assert closing.payload == {"reason": "reopen_window_expired", "child_ticket_id": str(child_id)}
+    assert (closing.actor_type.value, closing.actor_id) == ("customer", old.customer_id)
+    assert closing.created_at == api.clock.now
+    assert (status.event_type, status.payload) == ("status_changed",
+                                                    {"from": "resolved", "to": "closed"})
+    view = api.customer(token).get("/api/customer/ticket").json()
+    assert view["status"] == "closed" and view["message_starts_new_ticket"] is True
+    api.sweep()
+    assert api.ticket(old_id).version == closed.version  # the sweep did not touch it again
+    assert agent.client.get(f"/api/agent/tickets/{old_id}").json()["ticket"]["status"] == "closed"

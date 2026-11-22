@@ -1,4 +1,5 @@
-"""Lead API. Implements: RPT-1, RPT-2, AUD-3, SLA-3 (holidays), CLM-2 (reassign), D-014.
+"""Lead API. Implements: RPT-1, RPT-2, AUD-3, SLA-3 (holidays), CLM-2 (reassign), D-014,
+D-040.
 
 Every endpoint: require_lead (403 for a plain agent), CSRF header on writes (middleware),
 rate-limit group `agent` (120/min/session).
@@ -9,6 +10,7 @@ from datetime import date
 
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
+from sqlalchemy import select
 
 from app.api.agent import ticket_detail
 from app.api.csv_export import csv_response, ist
@@ -17,7 +19,9 @@ from app.db import Tx, load_holidays
 from app.domain import holidays as holiday_domain
 from app.domain import tickets as domain
 from app.domain.reports import LateRow, late_report
+from app.models import Agent
 from app.schemas.agent import (
+    AgentListItem,
     AgentRef,
     AssignIn,
     HolidayIn,
@@ -32,6 +36,15 @@ from app.security.ratelimit import limit_agent
 from app.security.sessions import CurrentLead
 
 router = APIRouter(prefix="/api/lead", tags=["lead"])
+
+
+@router.get("/agents", response_model=list[AgentListItem])
+@limit_agent
+def list_agents(request: Request, ctx: Tx, lead: CurrentLead) -> list[AgentListItem]:
+    """D-040: the people a ticket can be assigned to — {id, name, role}, no emails (minimum
+    data for the assign dialog)."""
+    agents = ctx.session.scalars(select(Agent).order_by(Agent.name))
+    return [AgentListItem.model_validate(a) for a in agents]
 
 
 @router.post("/tickets/{ticket_id}/assign", response_model=TicketDetail)

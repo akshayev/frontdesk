@@ -70,3 +70,16 @@ def test_every_endpoint_happy_path(api: ApiHarness) -> None:
     assert meera.client.get("/api/lead/audit/verify").json()["ok"] is True
     assert priya.client.get("/api/lead/reports/late").status_code == 403
     assert api.app.openapi_url == "/openapi.json"
+
+
+def test_d040_lead_agent_list_has_no_emails(api: ApiHarness) -> None:
+    """D-040: lead-only; exactly {id, name, role} per agent — no emails (minimum data)."""
+    lead = api.agent("Meera Iyer", AgentRole.lead)
+    agent = api.agent("Arjun Nair")
+    resp = lead.client.get("/api/lead/agents")
+    assert resp.status_code == 200
+    rows = resp.json()
+    assert all(set(r) == {"id", "name", "role"} for r in rows)
+    assert {"name": "Arjun Nair", "role": "agent", "id": str(agent.id)} in rows
+    assert "@" not in resp.text
+    assert agent.client.get("/api/lead/agents").status_code == 403

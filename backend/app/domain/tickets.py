@@ -472,8 +472,11 @@ def customer_message(ctx: RequestContext, holidays: Holidays, ticket_id: uuid.UU
     - waiting_on_customer → WAIT-3 / D-026: resume the clock, status open.
     - resolved inside the window → RO-2: reopen (as RO-1), reopen_count + 1.
     - resolved past the window, or closed → RO-4 / D-012: a NEW ticket for the same customer,
-      subject "Re: <old subject>", same priority, parent_ticket_id = old; the old ticket is
-      not changed. The new raw token is returned once.
+      subject "Re: <old subject>", same priority, parent_ticket_id = old. The new raw token is
+      returned once. D-041: a resolved-past-window old ticket is closed in the SAME
+      transaction (reason reopen_window_expired, actor customer, child_ticket_id in the
+      payload) instead of waiting for the sweep, so there is never a moment with two active
+      tickets for one problem. An already-closed old ticket is not changed.
     """
     ticket = lock_ticket(ctx, ticket_id)
     actor = Actor.of_customer(ticket)
@@ -485,6 +488,9 @@ def customer_message(ctx: RequestContext, holidays: Holidays, ticket_id: uuid.UU
                                subject=_followup_subject(ticket.subject), body=body,
                                priority=ticket.priority, actor=actor, channel="followup",
                                parent=ticket)
+        if ticket.status is S.resolved:
+            auto_close(ctx, ticket, CloseReason.reopen_window_expired, actor,
+                       {"child_ticket_id": child.id})
         return CustomerWriteResult(ticket=child, new_ticket_token=token)
 
     message = _add_message(ctx, ticket, AuthorType.customer, None, body)
@@ -516,13 +522,16 @@ def customer_reopen(ctx: RequestContext, holidays: Holidays, ticket_id: uuid.UUI
 # --- system ----------------------------------------------------------------------------------
 
 
-def auto_close(ctx: RequestContext, ticket: Ticket, reason: CloseReason) -> None:
-    """WAIT-4 / RO-3: the sweep closes a (locked) ticket as actor system. The SLA columns are
-    left as they were, so a closed ticket keeps its final (frozen) SLA state."""
+def auto_close(ctx: RequestContext, ticket: Ticket, reason: CloseReason,
+               actor: Actor = SYSTEM, extra: dict[str, Any] | None = None) -> None:
+    """WAIT-4 / RO-3: close a (locked) ticket by rule — by the sweep (actor system), or by a
+    customer write after the reopen window (actor customer, D-041). Events auto_closed
+    {reason, **extra} + status_changed; version += 1. The SLA columns are left as they were,
+    so a closed ticket keeps its final (frozen) SLA state."""
     ticket.closed_at = ctx.now
     ticket.close_reason = reason
-    _event(ctx, ticket, SYSTEM, "auto_closed", {"reason": reason.value})
-    _set_status(ctx, ticket, SYSTEM, S.closed)
+    _event(ctx, ticket, actor, "auto_closed", {"reason": reason.value, **(extra or {})})
+    _set_status(ctx, ticket, actor, S.closed)
     _bump(ctx, ticket)
 
 

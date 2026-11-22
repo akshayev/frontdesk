@@ -33,15 +33,20 @@ frontdesk/
       models.py             SQLAlchemy models
       sla/calendar.py       PURE: working-time maths (no DB, no FastAPI imports)
       sla/policy.py         PURE: targets, priority-change rules, badge computation
-      domain/tickets.py     state machine + use cases (claim, reply, note, wait, resolve, reopen, priority)
+      domain/tickets.py     state machine + use cases (claim, reply, note, wait, resolve, reopen, priority), DomainError, allowed_actions
+      domain/reports.py     lead late report (RPT-1) built from ticket rows + audit events only
+      domain/holidays.py    lead holiday list/add/remove (audited)
       audit/chain.py        append_event(), canonical JSON, hash, verify()
       security/             passwords.py sessions.py csrf.py ratelimit.py headers.py customer_token.py
-      api/auth.py api/agent.py api/lead.py api/customer.py api/public.py api/health.py
+      api/auth.py api/agent.py api/lead.py api/customer.py api/public.py api/health.py (/healthz itself is defined in main.py)
+      api/errors.py         DomainError → standard error JSON
+      api/csv_export.py     CSV responses with the formula-injection guard (transcript, late report)
       schemas/agent.py      Pydantic response/request models for agent + lead APIs
       schemas/customer.py   Pydantic models for customer + public APIs — MUST NOT import InternalNote
-      jobs/sweep.py         auto-close (WAIT-4, RO-3)
-    scripts/seed.py
+      jobs/sweep.py         auto-close (WAIT-4, RO-3) + the lifespan loop (sweep_once / sweep_loop)
+    scripts/seed.py         demo data through the domain functions (`uv run python -m scripts.seed`)
     tests/unit/  tests/integration/  tests/architecture/
+                            integration/api_support.py: API test harness (frozen DB time, direct sessions)
   frontend/                 Vite React TS Tailwind TanStack Query
 ```
 
@@ -82,6 +87,7 @@ DB-level protection (migration, raw SQL):
 | resolved (≤7 days) | customer reopen / customer reply | customer | open (resume) |
 | waiting_on_customer (5 working days silent) | sweep | system | closed (no_customer_reply) |
 | resolved (>7 days) | sweep | system | closed (reopen_window_expired) |
+| resolved (>7 days) | customer writes | customer | old → closed (reopen_window_expired) + new ticket, parent_ticket_id = old, same transaction (D-041) |
 | closed | customer writes | customer | new ticket, parent_ticket_id = old |
 | new/open/waiting | change priority | assignee or lead | same |
 
@@ -111,7 +117,7 @@ At the start of each request transaction the app runs `SELECT now()` and uses th
   3. canonical = JSON of {ticket_id, actor_type, actor_id, event_type, payload, created_at ISO-8601 UTC with microseconds}, `sort_keys=True, separators=(",", ":")`
   4. `hash = sha256(prev_hash + canonical_bytes)`; insert row with `created_at = now`.
 - `verify(session) -> {ok: bool, checked: int, first_bad_id: int|None}` recomputes in id order.
-- Event types: ticket_created, claimed, released, assigned, customer_message, agent_reply, note_added, status_changed, priority_changed, resolved, reopened, auto_closed, holiday_added, holiday_removed, login_succeeded, login_failed, account_locked.
+- Event types: ticket_created, claimed, released, assigned, customer_message, agent_reply, note_added, status_changed, priority_changed, resolved, reopened, auto_closed (actor system from the sweep, or customer when a write after the reopen window closes the ticket, D-041), holiday_added, holiday_removed, login_succeeded, login_failed, account_locked.
 - Payloads never contain note bodies (LEAK-3). Message events contain message_id only.
 
 ## 9. Background sweep (`app/jobs/sweep.py`)
@@ -120,7 +126,7 @@ Runs in a lifespan asyncio loop every 5 minutes and once at startup; idempotent.
 ## 10. API surface
 Auth: `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
 Agent: `GET /api/agent/tickets?view=mine|unassigned|all|late|waiting`, `POST /api/agent/tickets`, `GET /api/agent/tickets/{id}`, `POST …/{id}/claim`, `POST …/{id}/release`, `POST …/{id}/replies` {body, expected_version, wait_for_customer}, `POST …/{id}/notes` {body}, `POST …/{id}/resolve` {expected_version}, `PATCH …/{id}/priority` {priority, expected_version}, `GET …/{id}/transcript.csv` (public messages only)
-Lead: `POST /api/lead/tickets/{id}/assign`, `GET /api/lead/reports/late` (+ `.csv`), `GET/POST/DELETE /api/lead/holidays`, `GET /api/lead/audit/verify`
+Lead: `GET /api/lead/agents` ({id, name, role} only, no emails — D-040), `POST /api/lead/tickets/{id}/assign`, `GET /api/lead/reports/late` (+ `.csv`), `GET/POST/DELETE /api/lead/holidays`, `GET /api/lead/audit/verify`
 Customer (header `X-Ticket-Token`): `GET /api/customer/ticket`, `POST /api/customer/ticket/messages`, `POST /api/customer/ticket/reopen`
 Public: `POST /api/public/tickets` (returns secret link once)
 Ops: `GET /healthz`

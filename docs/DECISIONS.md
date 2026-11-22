@@ -138,6 +138,17 @@ Targets (working min): urgent 120/540 · medium 270/1620 · low 540/2700. Calend
 - Rejected: relaxing the CSP on /docs only; turning /docs on under the strict CSP (the page would render blank).
 - (D-033 is reserved for the UI-pattern research that will be added in Sprint 4.)
 
+## D-040 · S3 · `GET /api/lead/agents` for the assign dialog (approved by owner, Sprint 3)
+- Lead-only (`require_lead`, rate-limit group `agent`). Returns `{id, name, role}` per agent, sorted by name. No emails: that is the minimum data the dialog needs.
+- Why: the lead's assign dialog (CLM-2) needs the people a ticket can go to, and ARCHITECTURE §10 had no endpoint for it.
+- Rejected: reusing `AgentOut` (it includes the email); opening it to all agents (only the lead assigns).
+
+## D-041 · S3 · A customer write after the reopen window closes the old ticket immediately (approved by owner, Sprint 3; refines D-012 / RO-4)
+- When a customer writes to a `resolved` ticket past its 7-day window, the same transaction creates the child ticket (RO-4) and closes the old one: `closed`, reason `reopen_window_expired`, `closed_at` = now. The audit log gets `auto_closed {reason, child_ticket_id}` and `status_changed {resolved → closed}`, both with actor `customer`, and the old ticket's version goes up by 1. The sweep then finds nothing to do for that ticket. A ticket that is already `closed` is not changed.
+- Why: otherwise the old ticket stays "resolved" for up to 5 minutes (until the next sweep). In that window two tickets look active for the same problem, and the customer page and the agent view disagree. Closing in the same transaction keeps the state consistent at every instant, which is the principle behind the single-transaction design (D-021).
+- Event type: `auto_closed` is reused because the close is rule-driven, not a person's decision. The actor (system vs customer) shows which trigger fired. No new event type is needed.
+- Rejected: leaving the close to the sweep (the inconsistent window described above).
+
 ---
 
 ## Incident → design map (interview)
