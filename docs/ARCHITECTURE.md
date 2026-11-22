@@ -20,9 +20,10 @@ frontdesk/
   README.md  COMPLETION_NOTE.md
   docs/  PRD.md ARCHITECTURE.md SECURITY.md TEST-PLAN.md DECISIONS.md TIMELOG.md
   docker-compose.yml        local Postgres 16
-  Dockerfile                multi-stage: node build → python runtime
+  Dockerfile  .dockerignore  multi-stage: node build → python runtime (non-root, no migrations — D-043)
+  render.yaml               Render Blueprint: one free web service, Singapore, /healthz
   .env.example
-  .github/workflows/ci.yml
+  .github/workflows/ci.yml  backend (PG 16 service, ruff, pytest, pip-audit) + frontend (check:api, tsc, lint, vitest, build, npm audit)
   backend/
     pyproject.toml          managed by uv
     alembic.ini  alembic/versions/
@@ -139,7 +140,7 @@ Errors: JSON `{error: code, message, request_id}`; codes include `stale_version`
 
 ## 11. Frontend routes
 `/` (redirect by session), `/login`, `/tickets` (list), `/tickets/:id`, `/reports/late` (lead), `/holidays` (lead), `/new` (public submit), `/t` (customer view; token read from `location.hash` on every load and sent as `X-Ticket-Token`; it stays in the fragment so refresh and bookmarks keep working — D-038 supersedes the earlier `history.replaceState` plan), `*` → not found. Lazy route chunks; guards via `GET /api/auth/me`; architecture in D-037.
-Serving (`app/spa.py`): API routes win; unknown `/api/*` → JSON 404 for every method (a known API path with the wrong method → 405 + `Allow`); `/assets/*` → `Cache-Control: public, max-age=31536000, immutable`; any other GET → `index.html` with `no-cache`. The CSP is the same as on every response.
+Serving (`app/spa.py`): API routes win; unknown `/api/*` → JSON 404 for every method (a known API path with the wrong method → 405 + `Allow`); `/assets/*` → `Cache-Control: public, max-age=31536000, immutable`; any other GET → `index.html` with `no-cache`; HEAD is answered like GET without a body (uptime monitors), also on `/healthz`; `/docs` and `/redoc` → JSON 404 when Swagger is off (production, D-035). The CSP is the same as on every response.
 
 ## 12. Deployment
 Dockerfile stage 1 `node:24-slim` builds `frontend/dist`; stage 2 `python:3.12-slim` installs the backend with uv (`uv sync --frozen --no-dev`), copies dist to `app/static`, runs as a non-root user and starts only `uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'`. `'*'` is acceptable only because Render's proxy is the sole ingress to the container (SECURITY §7).

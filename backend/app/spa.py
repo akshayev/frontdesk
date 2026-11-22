@@ -8,6 +8,9 @@
   immutable`. A missing asset is a 404 (never index.html, which would be served as JS).
 - Any other GET → a real top-level file if it exists (e.g. favicon), otherwise `index.html`
   (client-side routing), both with `Cache-Control: no-cache` so a new deploy is picked up.
+- HEAD is answered like GET without a body (uptime monitors send HEAD by default).
+- Swagger UI paths (`/docs`, `/redoc`) are JSON 404 when Swagger is off (production, D-035)
+  instead of index.html, so nobody mistakes the SPA's page for a live docs endpoint.
 
 The SECURITY §5 headers (strict CSP) come from SecurityHeadersMiddleware like on every other
 response; nothing here changes them.
@@ -27,6 +30,7 @@ DEV_DIST = APP_DIR.parents[1] / "frontend" / "dist"  # local `npm run build` out
 IMMUTABLE = "public, max-age=31536000, immutable"
 NO_CACHE = "no-cache"
 RESERVED = ("api", "healthz", "openapi.json")
+SWAGGER = ("docs", "redoc")  # reserved while FastAPI's docs_url is off (D-035)
 ALL_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 # Registered last, in this order; tests that add routes later keep these at the end.
 FALLBACK_PATHS = ("/api", "/api/{path:path}", "/{path:path}")
@@ -94,10 +98,10 @@ def install_spa(app: FastAPI, static_dir: Path | None) -> None:
                                 headers={"Allow": ", ".join(sorted(allowed))})
         raise _not_found("No such endpoint.")
 
-    @app.get("/{path:path}", include_in_schema=False)
+    @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
     def spa(request: Request, path: str) -> Response:
         first = path.split("/", 1)[0]
-        if first in RESERVED:
+        if first in RESERVED or (first in SWAGGER and request.app.docs_url is None):
             raise _not_found("No such endpoint.")
         if static_dir is None:
             raise _not_found("The web app is not built.")

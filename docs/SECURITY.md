@@ -41,7 +41,7 @@ The CSP is the same on every path. Swagger UI (`/docs`) is served in development
 - IP addresses in the immutable audit log cannot be erased — accepted for security forensics; production would add a retention design. (Login events, D-031; emails are never stored there — actor_id or HMAC only.)
 - Demo credentials are published in README for evaluators; a real deployment would force password change.
 - Lockout (D-029) can be abused for denial of service: anyone who knows a published demo email can lock that account for 15 minutes. Mitigation for the demo: two lead accounts (D-044). Production would add CAPTCHA / per-IP+account throttling.
-- `--forwarded-allow-ips='*'` relies on Render's proxy being the only ingress.
+- `--forwarded-allow-ips='*'` (uvicorn trusts `X-Forwarded-For` / `-Proto` from any peer) relies on Render's proxy being the only ingress: a Render web service has no public port of its own, every request arrives through Render's TLS proxy, which sets those headers. On any host where the container port is reachable directly, this must become the proxy's address, otherwise clients could spoof their IP (rate limits, audit IPs) and the https scheme.
 - No email delivery, so "reply sent" means "recorded in Frontdesk".
 
 ## 8. Per-sprint security review checklist
@@ -78,3 +78,12 @@ The CSP is the same on every path. Swagger UI (`/docs`) is served in development
 - [x] pip-audit / npm audit clean — "No known vulnerabilities found"; `npm audit --omit=dev` and full `npm audit`: "found 0 vulnerabilities".
 - [x] No raw SQL built with string formatting — no new SQL.
 - [x] Frontend (D-037, D-038): CSP unchanged and verified in headless Chrome on every screen (no violations, no console errors); no inline `style` props and no `dangerouslySetInnerHTML` (both enforced by oxlint rules); fonts bundled, `assetsInlineLimit: 0` (no `data:` URIs), no third-party origins; message bodies rendered as text (`whitespace-pre-wrap`); `X-Requested-With: frontdesk` on every non-GET (F-2); customer token only in the fragment and the `X-Ticket-Token` header, query keys hold a hash of it; `/login?next=` accepts same-site paths only (no open redirect); `<meta name="referrer" content="no-referrer">` in addition to the header.
+
+### Sprint 5 review (22 Nov 2026)
+- [x] No secrets in diff — `git diff | grep -iE "password|secret|key|token"` reviewed: env-var names, docs and the CI database passwords, which are per-run throwaway values (`ci-*-${{ github.run_id }}`) for a service container that lives only for the job; the CI SESSION_SECRET is generated per run with `openssl rand`. Production values (seed password, SESSION_SECRET, app-role URL) exist only in git-ignored `.env.neon` and `DEPLOY-VALUES.local.md` (mode 600) and were never printed. secret-guard scan clean.
+- [x] Every new endpoint has an auth dependency and a rate-limit group — no new API endpoint. `HEAD /healthz` (uptime monitors) returns an empty 200 like GET; the SPA catch-all also answers HEAD. `/docs` and `/redoc` are JSON 404 in production (D-035), tested (S-5).
+- [x] Every new customer-facing schema checked: no note fields — no schema change.
+- [x] Every mutation goes through domain layer — no new mutation. The production seed ran through the domain functions as `frontdesk_app`; `verify()` ok on Neon.
+- [x] pip-audit / npm audit clean — run locally and in CI on every push.
+- [x] No raw SQL built with string formatting — no new SQL.
+- [x] Deploy (D-043): the image has no secrets (`.dockerignore` excludes `.env*`, `*.local.md`, `.git`), runs as non-root uid 10001 with the code read-only, has no uv or build tools, and never migrates; Render receives only the app-role `DATABASE_URL` (Neon direct host, `sslmode=require`; client TLS verified), `SESSION_SECRET`, `PUBLIC_BASE_URL`. CI runs with `permissions: contents: read`. Lockout DoS noted in §7 (D-044).

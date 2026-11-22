@@ -1,0 +1,26 @@
+# Render Blueprint (ARCHITECTURE §12). One web service built from the Dockerfile.
+# D-043: the service only gets the frontdesk_app DATABASE_URL. No owner URL, no APP_DB_PASSWORD,
+# no SEED_DEMO_PASSWORD here — migrations and the seed run from the developer machine.
+services:
+  - type: web
+    name: frontdesk
+    runtime: docker
+    plan: free
+    region: singapore # next to Neon aws-ap-southeast-1
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: SWEEP_ENABLED
+        value: "true"
+      # Secrets / per-deploy values: entered by hand in the Render dashboard.
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false

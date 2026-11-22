@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# Least privilege: the jobs only read the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # astral-sh/setup-uv no longer publishes floating major tags after v7, so it is pinned to
+  # an exact release; uv itself is pinned to the same version as the Dockerfile.
+  UV_VERSION: "0.13.9"
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: frontdesk_owner
+          POSTGRES_DB: frontdesk
+          # Throwaway database that lives only for this job (not a real credential).
+          POSTGRES_PASSWORD: ci-owner-${{ github.run_id }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U frontdesk_owner -d frontdesk"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      APP_ENV: development
+      SWEEP_ENABLED: "false"
+      MIGRATION_DATABASE_URL: postgresql+psycopg://frontdesk_owner:ci-owner-${{ github.run_id }}@localhost:5432/frontdesk
+      APP_DB_PASSWORD: ci-app-${{ github.run_id }}
+      DATABASE_URL: postgresql+psycopg://frontdesk_app:ci-app-${{ github.run_id }}@localhost:5432/frontdesk
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Session secret for this run only
+        run: echo "SESSION_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+      - run: uv sync --frozen
+      - name: Lint
+        run: uv run ruff check .
+      - name: Tests (real PostgreSQL 16)
+        run: uv run pytest -q
+      - name: Dependency audit
+        run: uv run pip-audit
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      # check:api exports the OpenAPI schema from the backend, so it needs the backend deps.
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: npm ci
+      - name: Backend deps (for the OpenAPI export)
+        working-directory: backend
+        run: uv sync --frozen --no-dev
+      - name: API contract has not drifted
+        run: npm run check:api
+      - name: Type-check
+        run: npx tsc -b
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npx vitest run
+      - name: Build
+        run: npm run build
+      - name: Dependency audit (runtime deps)
+        run: npm audit --omit=dev

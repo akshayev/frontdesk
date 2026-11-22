@@ -58,6 +58,7 @@ All tests run with `uv run pytest`. Integration tests use real PostgreSQL 16 (do
 | S-2 | `/assets/*` → file with `public, max-age=31536000, immutable`; missing asset → 404 (not index.html) |
 | S-3 | Unknown `/api/*` → JSON 404 in the standard shape for every method (also `/healthz/x`, `/openapi.json/x` on GET); a known API path with the wrong method → 405 + `Allow`; real API routes, `/healthz`, `/openapi.json` unaffected; CSV endpoints declared `text/csv` in the schema |
 | S-4 | No path traversal out of the build directory; without a build the API still works |
+| S-5 | HEAD on `/healthz`, client routes, assets and `/openapi.json` → 200, empty body; production: `/docs`, `/docs/*`, `/redoc` → JSON 404 (Swagger UI still served in development) |
 
 ## Frontend unit (`frontend/src/**/*.test.ts(x)`, Vitest, D-039)
 | ID | Case |

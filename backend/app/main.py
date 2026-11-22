@@ -16,7 +16,7 @@ import asyncio
 import contextlib
 from collections.abc import AsyncIterator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from sqlalchemy import Engine
 
 from app.api import agent, auth, customer, lead, public
@@ -75,6 +75,11 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
+
+    # Uptime monitors send HEAD by default; kept out of the schema (same endpoint as GET).
+    @app.head("/healthz", include_in_schema=False)
+    def healthz_head() -> Response:
+        return Response(status_code=200)
 
     # Last: every API route above wins over the SPA catch-all.
     install_spa(app, resolve_static_dir(settings.static_dir))

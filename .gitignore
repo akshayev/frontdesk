@@ -25,3 +25,5 @@ app/static
 .claude/
 .mcp.json
 skills-lock.json
+# Local deploy notes with secrets (never commit)
+*.local.md

@@ -130,3 +130,26 @@ def test_without_a_build_the_api_still_works(tmp_path: Path) -> None:
     assert client.get("/healthz").status_code == 200
     resp = client.get("/tickets")
     assert resp.status_code == 404 and resp.json()["error"] == "not_found"
+
+
+@pytest.mark.parametrize("path", ["/healthz", "/", "/tickets/3f1c", "/assets/index-Ab12Cd.js",
+                                  "/openapi.json"])
+def test_head_is_answered_like_get(client: TestClient, path: str) -> None:
+    """Uptime monitors (UptimeRobot) send HEAD by default: same status as GET, no body."""
+    resp = client.head(path)
+    assert resp.status_code == 200 and resp.content == b""
+    assert resp.headers["content-security-policy"] == CSP
+
+
+@pytest.mark.parametrize("path", ["/docs", "/docs/oauth2-redirect", "/redoc"])
+def test_swagger_paths_are_json_404_in_production(built: Path, path: str) -> None:
+    """D-035: no Swagger UI in production, and its paths are not answered by the SPA either."""
+    client = TestClient(create_app(Settings(static_dir=str(built), app_env="production")))
+    resp = client.get(path)
+    assert resp.status_code == 404
+    assert resp.json()["error"] == "not_found"
+
+
+def test_swagger_ui_still_served_in_development(client: TestClient) -> None:
+    assert client.get("/docs").status_code == 200
+    assert "swagger" in client.get("/docs").text.lower()
