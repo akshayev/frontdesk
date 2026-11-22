@@ -4,7 +4,7 @@ import type { FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { isApiError } from '../../../api/errors'
 import { Button } from '../../../components/ui/Button'
-import { TextField } from '../../../components/ui/Field'
+import { PasswordField, TextField } from '../../../components/ui/Field'
 import { AlertIcon } from '../../../components/ui/Icon'
 import { usePageTitle } from '../../../lib/usePageTitle'
 import { safeNext, useLogin } from '../queries'
@@ -16,9 +16,11 @@ export default function LoginPage() {
   usePageTitle('Sign in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   function onSubmit(event: FormEvent) {
     event.preventDefault()
+    setShowPassword(false) // D-048: hidden again after every submit attempt
     login.mutate({ email: email.trim(), password }, {
       onSuccess: () => navigate(safeNext(params.get('next')), { replace: true }),
     })
@@ -54,8 +56,9 @@ export default function LoginPage() {
           <form className="mt-6 space-y-4" onSubmit={onSubmit} noValidate>
             <TextField label="Email" type="email" autoComplete="username" required
               value={email} onChange={(e) => setEmail(e.target.value)} inputMode="email" />
-            <TextField label="Password" type="password" autoComplete="current-password" required
-              value={password} onChange={(e) => setPassword(e.target.value)} />
+            <PasswordField label="Password" autoComplete="current-password" required
+              value={password} onChange={(e) => setPassword(e.target.value)}
+              visible={showPassword} onVisibleChange={setShowPassword} />
             {message && (
               <p role="alert" className="flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm
                 text-red-900 ring-1 ring-red-200">
@@ -74,7 +77,7 @@ export default function LoginPage() {
                 Submit a problem
               </Link>
             </p>
-            <p className="text-slate-600">Demo accounts are listed in the README.</p>
+            <p className="text-slate-600">Demo credentials are provided in the submission form.</p>
           </div>
         </div>
       </main>

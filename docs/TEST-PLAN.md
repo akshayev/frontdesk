@@ -76,6 +76,7 @@ All tests run with `uv run pytest`. Integration tests use real PostgreSQL 16 (do
 | F-1 | Composer: note mode shows banner, lock icon, "Save internal note"; reply mode "Send to customer"; switching modes never posts to the wrong endpoint |
 | F-2 | `client.ts`: standard error JSON → ApiError; non-JSON body handled; `X-Requested-With` on non-GET only; `X-Ticket-Token` when given |
 | F-3 | `formatWorkingMinutes` and badge text for late / at_risk / on_track / paused / met |
+| F-4 | Password show/hide toggle (D-048): toggles `type` password ↔ text, `aria-label` Show/Hide password and `aria-pressed`; value and `autocomplete` unchanged; `type="button"`, click/Enter/Space never submit; mouse click keeps focus in the input; hidden again on `pagehide` and on every login submit attempt (pending and failed) |
 
 ## Sprint gate (must pass before the next sprint)
 1. `uv run ruff check .` clean

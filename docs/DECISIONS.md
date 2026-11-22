@@ -190,6 +190,9 @@ Live re-verification of `db2fa69` failed: every audit IP was Render's internal 1
 ## D-047 · 16:32 · Demo credentials are not published (supersedes part of D-044)
 Demo credentials are not published. The password that appeared in README (commit 727f333) was rotated on production; existing sessions were revoked; README now says credentials are in the submission form, and lists roles only (no emails). Supersedes the 'demo emails + password in README' part of D-044 (two leads still exist, for the lockout reason). Why: a public password lets anyone change evaluation data, and the audit log is permanent so it could not be cleaned.
 
+## D-048 · 16:45 · Show/hide password toggle
+Show/hide password toggle on the login form (and any other password input). Standard accessibility/usability pattern; it only changes how the typed value is displayed in the browser — nothing is stored or sent differently.
+
 ---
 
 ## Incident → design map (interview)
