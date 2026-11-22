@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: frontdesk_owner
+      POSTGRES_DB: frontdesk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports:
+      - "5432:5432"
+    volumes:
+      - frontdesk_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U frontdesk_owner -d frontdesk"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  frontdesk_pgdata:
