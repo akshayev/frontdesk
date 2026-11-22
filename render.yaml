@@ -17,9 +17,10 @@ services:
         value: production
       - key: SWEEP_ENABLED
         value: "true"
-      # D-045: Render's proxy is the one trusted hop; client IP = rightmost X-Forwarded-For.
+      # D-046: Render delivers X-Forwarded-For as <client>, <Cloudflare edge>, <Render internal>;
+      # the client is the 3rd entry from the right. (Not Blueprint-linked: set by hand in the dashboard.)
       - key: TRUSTED_PROXY_HOPS
-        value: "1"
+        value: "3"
       # Secrets / per-deploy values: entered by hand in the Render dashboard.
       - key: DATABASE_URL
         sync: false

@@ -44,14 +44,15 @@ All tests run with `uv run pytest`. Integration tests use real PostgreSQL 16 (do
 | I-12 | Login lockout after 5 failures; audited | locked (correct password then refused with the same generic 401 as any failure, D-029); login_failed + account_locked events present |
 | I-13 | Non-GET agent request without `X-Requested-With` | 403 |
 | I-14 | Customer token for ticket A cannot read ticket B | 404 |
-| I-15 | Behind one trusted proxy (`TRUSTED_PROXY_HOPS=1`) 7 failed logins with different forged leftmost `X-Forwarded-For` values: 6th and 7th are 429 and every audit event carries the proxy-appended IP; with hops=0 the header is ignored everywhere (D-045) | 429 + real IP |
+| I-15 | Render proxy format (`TRUSTED_PROXY_HOPS=3`): 7 failed logins with different forged leftmost `X-Forwarded-For` values and a changing Cloudflare edge: 6th and 7th are 429 and every audit event carries the real client IP; with hops=0 the header is ignored everywhere (D-045, D-046) | 429 + real IP |
 
-## Client IP (`tests/unit/test_client_ip.py`, D-045)
+## Client IP (`tests/unit/test_client_ip.py`, D-045, D-046)
 | ID | Case |
 |---|---|
-| C-1 | Spoofed leftmost entries ignored with hops=1; single entry; whitespace stripped; several header lines = one list; hops=2 |
+| C-1 | Exact observed Render format, hops=3 → client; spoofed 4+-entry variant (fake prepended) → still the real client; hops=1 rightmost; whitespace stripped; several header lines = one list |
 | C-2 | hops=0 ignores the header entirely; default setting is 0; negative hops rejected |
-| C-3 | Missing, short or malformed header (garbage, empty, `ip:port`, out-of-range) → socket peer; IPv6 accepted and canonicalised |
+| C-3 | Missing header, fewer entries than hops (with the DEBUG line) or malformed entry (garbage, empty, `ip:port`, out-of-range) → socket peer; IPv6 accepted and canonicalised |
+| C-4 | Tripwire (D-046): chosen IP ≠ `CF-Connecting-IP` → one WARNING without IP values, chosen IP unchanged; silent when equal, absent or hops=0; fires when the chain got shorter. Diagnostic is DEBUG only and logs header names, never values or cookies |
 
 ## Architecture (`tests/architecture/`)
 | ID | Case |

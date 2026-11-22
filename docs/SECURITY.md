@@ -23,7 +23,7 @@
 - Customer token scopes access to exactly one ticket.
 
 ## 4. Rate limits (slowapi, in-memory, single instance)
-Login 5/min/IP (client IP per D-045: rightmost X-Forwarded-For behind Render's proxy) · customer 30/min/IP and public 30/min/IP (separate buckets, D-032) · agent API 120/min/session. Limitation: counters reset on restart and are per-instance (lockout is persistent in DB).
+Login 5/min/IP (client IP per D-045/D-046: 3rd X-Forwarded-For entry from the right on Render) · customer 30/min/IP and public 30/min/IP (separate buckets, D-032) · agent API 120/min/session. Limitation: counters reset on restart and are per-instance (lockout is persistent in DB).
 
 ## 5. Headers (middleware)
 `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'` · `X-Frame-Options: DENY` · `X-Content-Type-Options: nosniff` · `Referrer-Policy: no-referrer` · `Strict-Transport-Security: max-age=31536000` (production only).
@@ -41,7 +41,8 @@ The CSP is the same on every path. Swagger UI (`/docs`) is served in development
 - IP addresses in the immutable audit log cannot be erased — accepted for security forensics; production would add a retention design. (Login events, D-031; emails are never stored there — actor_id or HMAC only.)
 - Demo credentials are published in README for evaluators; a real deployment would force password change.
 - Lockout (D-029) can be abused for denial of service: anyone who knows a published demo email can lock that account for 15 minutes. Mitigation for the demo: two lead accounts (D-044). Production would add CAPTCHA / per-IP+account throttling.
-- Client IP depends on exactly one trusted proxy hop (D-045): production sets `TRUSTED_PROXY_HOPS=1` and takes the rightmost `X-Forwarded-For` entry, which Render's proxy appends. Clients can prepend fake entries but cannot change that one. If the service were ever put behind a second proxy/CDN, `TRUSTED_PROXY_HOPS` must be raised, otherwise every client appears as the proxy. An earlier version trusted the header from any peer (`--forwarded-allow-ips='*'`) on the assumption that Render being the only ingress made that safe; the live test of 22 Nov 2026 showed it was not (the proxy keeps client-supplied entries), see D-045.
+- Client IP depends on Render's proxy chain (D-045, D-046): production sets `TRUSTED_PROXY_HOPS=3` and takes the 3rd `X-Forwarded-For` entry from the right (`<client>, <Cloudflare edge>, <Render internal>`). Clients can prepend fake entries but cannot change what the proxies append. If Render changes the chain length, the chosen IP becomes a proxy address (shared buckets) or falls back to the peer; the `CF-Connecting-IP` tripwire then logs "client-ip mismatch: proxy chain may have changed". An earlier version trusted the header from any peer (`--forwarded-allow-ips='*'`), and the next one took the rightmost entry (Render's own internal proxy); both were found by live tests on 22 Nov 2026.
+- Local container tests cannot reproduce proxy behaviour; proxy-dependent security must be verified on the live platform.
 - No email delivery, so "reply sent" means "recorded in Frontdesk".
 
 ## 8. Per-sprint security review checklist

@@ -378,18 +378,20 @@ def test_d031_login_audit_never_stores_the_typed_email(
         assert needle not in dump.lower()  # nowhere in the whole log, in any case
 
 
-def test_rate_limit_and_audit_ip_use_the_rightmost_forwarded_ip(
+def test_rate_limit_and_audit_ip_use_the_render_client_entry(
         auth_db: tuple[Engine, Engine]) -> None:
-    """D-045, live-test regression: faking X-Forwarded-For must not bypass the 5/min login limit
-    nor put forged IPs in the audit log (behind one trusted proxy, hops=1)."""
-    client = TestClient(_app(auth_db, production=True, hops=1))
+    """D-045/D-046 live-test regression: faking X-Forwarded-For must not bypass the 5/min login
+    limit nor put forged IPs in the audit log. Render format, hops=3:
+    <client>, <Cloudflare edge>, <Render internal>; the Cloudflare edge changes per request."""
+    client = TestClient(_app(auth_db, production=True, hops=3))
     email = _agent(auth_db)
     codes = [client.post("/api/auth/login", json={"email": email, "password": "wrong-password"},
-                         headers={**CSRF, "X-Forwarded-For": f"203.0.113.{n}, 198.51.100.9"}
+                         headers={**CSRF, "X-Forwarded-For":
+                                  f"203.0.113.{n}, 8.8.4.4, 172.70.1.{n}, 10.28.192.255"}
                          ).status_code for n in range(1, 8)]
     assert codes == [401] * 5 + [429] * 2
     ips = {p["ip"] for _, p in _events(auth_db, email)}
-    assert ips == {"198.51.100.9"}  # the proxy-appended address, never the forged ones
+    assert ips == {"8.8.4.4"}  # the real client, never a forged or proxy address
 
 
 def test_without_trusted_proxy_the_header_is_ignored_everywhere(

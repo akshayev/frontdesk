@@ -19,7 +19,8 @@ class Settings(BaseSettings):
     session_secret: SecretStr | None = None
     app_env: str = "development"
     public_base_url: str = "http://localhost:8000"
-    # D-045: 0 = use the socket peer (dev/tests); 1 = behind Render's proxy (rightmost entry).
+    # D-045/D-046: position from the right of the client's X-Forwarded-For entry;
+    # 0 = socket peer (dev/tests), 3 = Render production.
     trusted_proxy_hops: int = Field(default=0, ge=0, le=5)
     sweep_enabled: bool = True  # ARCHITECTURE §9 loop; tests set SWEEP_ENABLED=false
     seed_demo_password: SecretStr | None = None  # scripts/seed.py only; never hard-coded

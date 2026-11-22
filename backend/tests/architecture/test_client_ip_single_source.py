@@ -1,12 +1,14 @@
-"""A-3 (D-045): only app/security/client_ip.py may read X-Forwarded-For or the raw peer address;
-every rate-limit key and audit IP must come from client_ip()."""
+"""A-3 (D-045, D-046): only app/security/client_ip.py may read X-Forwarded-For, CF-Connecting-IP /
+True-Client-IP or the raw peer address; every rate-limit key and audit IP must come from
+client_ip()."""
 
 import re
 from pathlib import Path
 
 APP = Path(__file__).resolve().parents[2] / "app"
 ALLOWED = {APP / "security" / "client_ip.py"}
-PATTERN = re.compile(r"x-forwarded|request\.client\b|get_remote_address|forwarded_allow", re.I)
+PATTERN = re.compile(r"x-forwarded|cf-connecting|true-client|request\.client\b|get_remote_address"
+                     r"|forwarded_allow", re.I)
 
 
 def test_only_client_ip_module_reads_the_forwarded_header_or_peer() -> None:

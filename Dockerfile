@@ -37,6 +37,6 @@ USER frontdesk
 
 # Render sets $PORT; 8000 locally. No --proxy-headers / --forwarded-allow-ips (D-045): uvicorn
 # must not rewrite the client address from X-Forwarded-For. app/security/client_ip.py reads the
-# header itself (rightmost entry, TRUSTED_PROXY_HOPS=1 on Render).
+# header itself (3rd entry from the right, TRUSTED_PROXY_HOPS=3 on Render, D-046).
 EXPOSE 8000
 CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
