@@ -29,7 +29,8 @@ def login(request: Request, body: LoginIn, ctx: Tx) -> Response:
     Failures RETURN the 401 (not raise) so the transaction commits the failed-login count,
     the lock and their audit events.
     """
-    agent = authenticate(ctx, body.email, body.password, client_ip(request))
+    agent = authenticate(ctx, body.email, body.password, client_ip(request),
+                         request.app.state.settings)
     if agent is None:
         return error_response(request, 401, "invalid_credentials", GENERIC_LOGIN_MESSAGE)
     token = create_session(ctx, agent.id)

@@ -109,6 +109,16 @@ Targets (working min): urgent 120/540 · medium 270/1620 · low 540/2700. Calend
 - Implementation notes: a full Argon2 verification runs on every path (dummy hash for unknown emails) so timing is equal too; attempts while locked are audited as login_failed (reason "locked") and do not extend the lock; the failure count resets only on success (SECURITY §2). The 401 is returned, not raised, so the request transaction commits the counter and the audit events.
 - Rejected: 423 for locked accounts (tells an attacker the email exists and that guessing is working).
 
+## D-031 · S2 · Login audit events never store the typed email (approved by owner, Sprint 2; refines D-029)
+- Known account → record actor_id (the agent's id) and no email. Unknown email → record a keyed hash, HMAC-SHA256 with SESSION_SECRET of the lower-cased email (`email_hmac`), never the raw text. The client IP is kept (needed to investigate attacks).
+- Why: people often type their password into the email field; the audit log is insert-only by design (D-015), so anything written there is kept forever and can never be corrected or erased. The DPDP Act expects personal data to be kept only as long as needed, which an undeletable log cannot honour. The keyed hash still shows repeated attacks on the same address, while a mistyped password is unreadable. A plain (unkeyed) hash would be reversible by guessing common emails/passwords.
+- Consequence: rotating SESSION_SECRET means hashes before and after the rotation can no longer be matched to each other (acceptable; old events stay verifiable because the hash is just payload data).
+- Rejected: store the raw email (above); store nothing for unknown emails (hides targeted attacks).
+
+## D-032 · S2 · Customer and public rate limits are separate buckets (approved by owner, Sprint 2)
+- `/api/customer` and `/api/public` each have their own 30/min/IP bucket (slowapi shared scopes "customer" and "public").
+- Why: they are different actions (reading/replying on one's own ticket vs. submitting a new one). The customer page polling every 30 s uses 2 requests/min, well inside either limit; a shared bucket adds nothing.
+
 ---
 
 ## Incident → design map (interview)

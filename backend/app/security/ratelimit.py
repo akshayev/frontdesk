@@ -1,10 +1,11 @@
-"""slowapi rate-limit groups. Implements: SECURITY §4, D-016.
+"""slowapi rate-limit groups. Implements: SECURITY §4, D-016, D-032.
 
 In-memory, single process (limitation in SECURITY §7). Decorate every endpoint with exactly
 one group; the endpoint must take `request: Request`.
 - limit_login     5/min per client IP                    (POST /api/auth/login)
 - limit_customer  30/min per client IP, shared scope     (/api/customer/*)
 - limit_public    30/min per client IP, shared scope     (/api/public/*)
+  (customer and public are separate buckets on purpose, D-032)
 - limit_agent     120/min per session, shared scope      (/api/agent/*, /api/lead/*, and the
                   session endpoints /api/auth/logout, /api/auth/me) — keyed by sha256 of the
                   session cookie, falling back to the IP when there is no cookie.

@@ -16,12 +16,12 @@ from sqlalchemy.orm import Session
 from app.audit.chain import verify
 from app.config import get_settings
 from app.main import create_app
-from app.models import AgentRole, AuditEvent, Ticket
+from app.models import Agent, AgentRole, AuditEvent, Ticket
 from app.models import Session as SessionRow
 from app.security.customer_token import CustomerTicket, generate_token, hash_token
 from app.security.passwords import hash_password
 from app.security.ratelimit import limiter
-from app.security.sessions import GENERIC_LOGIN_MESSAGE, CurrentLead
+from app.security.sessions import GENERIC_LOGIN_MESSAGE, CurrentLead, email_hmac
 from tests.integration.conftest import migrated_database
 
 PASSWORD = "correct horse battery staple"
@@ -86,10 +86,11 @@ def _login(client: TestClient, email: str, password: str = PASSWORD):  # type: i
 
 
 def _events(auth_db: tuple[Engine, Engine], email: str) -> list[tuple[str, dict[str, object]]]:
+    """Login events of a KNOWN account, found by actor_id (D-031: payloads hold no email)."""
     with Session(auth_db[0]) as s:
+        agent_id = s.scalars(select(Agent.id).where(Agent.email == email)).one()
         rows = s.scalars(
-            select(AuditEvent).where(AuditEvent.payload["email"].astext == email)
-            .order_by(AuditEvent.id)
+            select(AuditEvent).where(AuditEvent.actor_id == agent_id).order_by(AuditEvent.id)
         ).all()
         return [(r.event_type, r.payload) for r in rows]
 
@@ -181,6 +182,7 @@ def test_i12_lockout_after_five_failures_is_audited(
         "locked"]
     assert [p["failed_count"] for e, p in events[:5]] == [1, 2, 3, 4, 5]
     assert all(p["ip"] == "testclient" for _, p in events)
+    assert all("email" not in p and "email_hmac" not in p for _, p in events)  # D-031
 
     with auth_db[0].begin() as conn:  # simulate the 15 minutes passing
         conn.execute(text("UPDATE agents SET locked_until = now() - interval '1 second' "
@@ -345,3 +347,27 @@ def test_agent_group_limited_per_session(
     limited = client.get("/api/auth/me")
     assert limited.status_code == 429 and limited.json()["error"] == "rate_limited"
     assert other.get("/api/auth/me").status_code == 200
+
+
+def test_d031_login_audit_never_stores_the_typed_email(
+    client: TestClient, auth_db: tuple[Engine, Engine]
+) -> None:
+    """D-031: unknown email → only HMAC-SHA256(SESSION_SECRET, lower-cased email) and the IP
+    are stored; the typed text (which may be a mistyped password) appears nowhere. The hash
+    is stable, so repeated attempts on one address can be correlated."""
+    typed = f"  Hunter2-Not-An-Account-{uuid.uuid4().hex[:6]}@Example.com "
+    for _ in range(2):
+        assert _login(client, typed.strip()).status_code == 401
+    expected = email_hmac(typed, get_settings())
+    assert expected == email_hmac(typed.strip().lower(), get_settings())
+    with Session(auth_db[0]) as s:
+        rows = s.scalars(select(AuditEvent).where(
+            AuditEvent.payload["email_hmac"].astext == expected)).all()
+        assert len(rows) == 2
+        for row in rows:
+            assert row.payload == {"reason": "unknown_email", "email_hmac": expected,
+                                   "ip": "testclient"}
+            assert row.actor_id is None
+        needle = typed.strip().lower().split("@")[0]
+        dump = s.execute(text("SELECT string_agg(payload::text, ' ') FROM audit_events")).scalar()
+        assert needle not in dump.lower()  # nowhere in the whole log, in any case

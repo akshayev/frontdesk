@@ -23,7 +23,7 @@
 - Customer token scopes access to exactly one ticket.
 
 ## 4. Rate limits (slowapi, in-memory, single instance)
-Login 5/min/IP · customer + public 30/min/IP · agent API 120/min/session. Limitation: counters reset on restart and are per-instance (lockout is persistent in DB).
+Login 5/min/IP · customer 30/min/IP and public 30/min/IP (separate buckets, D-032) · agent API 120/min/session. Limitation: counters reset on restart and are per-instance (lockout is persistent in DB).
 
 ## 5. Headers (middleware)
 `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'` · `X-Frame-Options: DENY` · `X-Content-Type-Options: nosniff` · `Referrer-Policy: no-referrer` · `Strict-Transport-Security: max-age=31536000` (production only).
@@ -37,6 +37,7 @@ Login 5/min/IP · customer + public 30/min/IP · agent API 120/min/session. Limi
 ## 7. Known limitations (be honest in COMPLETION_NOTE.md)
 - Hash chain is tamper-evident, not tamper-proof: a DB superuser could rewrite the whole chain. Next step: publish the head hash outside the DB periodically.
 - In-memory rate limits reset on restart.
+- IP addresses written to the immutable audit log (login events, D-031) cannot be erased later, e.g. on a data-deletion request. Kept deliberately for attack investigation; emails are never stored there (actor_id or HMAC only).
 - Demo credentials are published in README for evaluators; a real deployment would force password change.
 - `--forwarded-allow-ips='*'` relies on Render's proxy being the only ingress.
 - No email delivery, so "reply sent" means "recorded in Frontdesk".
@@ -56,3 +57,4 @@ Login 5/min/IP · customer + public 30/min/IP · agent API 120/min/session. Limi
 - [x] Every mutation goes through domain layer — no ticket mutations this sprint (domain layer is S3). Auth writes (agents lockout fields, sessions) are audited via `append_event`.
 - [x] pip-audit / npm audit clean — both "No known vulnerabilities" / "found 0 vulnerabilities".
 - [x] No raw SQL built with string formatting — all new SQL is SQLAlchemy constructs or bound parameters.
+- [x] Audit payloads checked for personal data — login events carry actor_id or an HMAC of the email, plus IP; never the typed email (D-031).

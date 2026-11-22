@@ -5,9 +5,14 @@ SECURITY §2, §3, D-005, D-016, D-029, AUD-1.
   `fd_session`; the database stores sha256(token), so a DB leak yields no usable session.
 - Login always fails with one generic 401 (D-029); failures, lockouts and successes are
   audited. Lockout: 5 failures → locked_until = now + 15 min; the count resets on success.
+- D-031: the audit log is permanent, so login events never contain the typed email. Known
+  account → actor_id only; unknown email → HMAC-SHA256(SESSION_SECRET, lower-cased email),
+  so repeated attacks on one address are visible but a password typed into the email field
+  is unreadable. The client IP is kept (attack investigation).
 """
 
 import hashlib
+import hmac
 import secrets
 import uuid
 from dataclasses import dataclass
@@ -101,29 +106,42 @@ def clear_session_cookie(response: Response, settings: Settings) -> None:
     )
 
 
+def email_hmac(email: str, settings: Settings) -> str:
+    """D-031: keyed hash of the normalised (stripped, lower-cased) email, hex."""
+    if settings.session_secret is None or not settings.session_secret.get_secret_value():
+        raise RuntimeError("SESSION_SECRET is not set; cannot audit unknown-email logins")
+    key = settings.session_secret.get_secret_value().encode("utf-8")
+    return hmac.new(key, email.strip().lower().encode("utf-8"), hashlib.sha256).hexdigest()
+
+
 def _audit_login(
     ctx: RequestContext, agent_id: uuid.UUID | None, event_type: str, payload: dict[str, object]
 ) -> None:
     append_event(ctx.session, ctx.now, None, ActorType.agent, agent_id, event_type, payload)
 
 
-def authenticate(ctx: RequestContext, email: str, password: str, ip: str | None) -> Agent | None:
+def authenticate(
+    ctx: RequestContext, email: str, password: str, ip: str | None, settings: Settings
+) -> Agent | None:
     """SECURITY §2, D-016, D-029: check credentials and apply the DB lockout.
 
     Returns the agent on success, None on ANY failure (unknown email, wrong password,
     locked) — the caller turns every None into the same 401. A full Argon2 verification runs
     on every path (dummy hash for unknown emails) so timing does not reveal which case it
     was. The agent row is locked FOR UPDATE so concurrent failures count correctly.
-    Audited: login_failed (reason), account_locked, login_succeeded (AUD-1).
+    Audited: login_failed (reason), account_locked, login_succeeded (AUD-1). Payloads never
+    hold the typed email (D-031): actor_id identifies a known account, `email_hmac` an
+    unknown one; `ip` is kept.
     """
     email = email.strip().lower()
-    base: dict[str, object] = {"email": email, "ip": ip}
+    base: dict[str, object] = {"ip": ip}
     agent = ctx.session.scalars(
         select(Agent).where(Agent.email == email).with_for_update()
     ).one_or_none()
     if agent is None:
         verify_password(None, password)
-        _audit_login(ctx, None, "login_failed", {**base, "reason": "unknown_email"})
+        _audit_login(ctx, None, "login_failed",
+                     {**base, "reason": "unknown_email", "email_hmac": email_hmac(email, settings)})
         return None
 
     password_ok = verify_password(agent.password_hash, password)
