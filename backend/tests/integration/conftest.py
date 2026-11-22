@@ -9,6 +9,7 @@
 import re
 import uuid
 from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -72,6 +73,30 @@ def run_alembic(engine: Engine, direction: str, target: str) -> None:
         getattr(command, direction)(cfg, target)
 
 
+def app_engine_for(name: str) -> Engine:
+    """Engine for database `name` as the restricted role frontdesk_app."""
+    return create_engine(_app_url().set(database=name))
+
+
+@contextmanager
+def migrated_database(name: str) -> Iterator[tuple[Engine, Engine]]:
+    """A fresh, fully migrated throwaway database → (owner engine, app engine).
+
+    Used by tests that need committed data with a clean audit chain (the shared
+    `frontdesk_test` database holds a deliberately fake audit row, see `seeded`).
+    """
+    recreate_database(name)
+    owner = owner_engine_for(name)
+    app = app_engine_for(name)
+    try:
+        run_alembic(owner, "upgrade", "head")
+        yield owner, app
+    finally:
+        app.dispose()
+        owner.dispose()
+        drop_database(name)
+
+
 @pytest.fixture(scope="session")
 def owner_engine() -> Iterator[Engine]:
     """Fresh, fully migrated `frontdesk_test` database; engine connects as the owner role."""
@@ -86,7 +111,7 @@ def owner_engine() -> Iterator[Engine]:
 @pytest.fixture(scope="session")
 def app_engine(owner_engine: Engine) -> Iterator[Engine]:
     """Engine for `frontdesk_test` connecting as the restricted role frontdesk_app."""
-    engine = create_engine(_app_url().set(database=TEST_DB))
+    engine = app_engine_for(TEST_DB)
     yield engine
     engine.dispose()
 
