@@ -76,16 +76,46 @@ def test_api_healthz_and_openapi_are_not_swallowed(client: TestClient) -> None:
     assert client.get("/healthz").json() == {"status": "ok"}
     schema = client.get("/openapi.json").json()
     assert "/api/agent/tickets" in schema["paths"]
-    assert "/{path}" not in schema["paths"]  # the catch-all is not part of the API contract
+    # The catch-alls are not part of the API contract.
+    assert not {"/{path}", "/api", "/api/{path}"} & set(schema["paths"])
     # A real API route still answers as the API (401 JSON), not with index.html.
     resp = client.get("/api/auth/me")
     assert resp.status_code == 401 and resp.json()["error"]
 
 
-def test_non_get_to_unknown_path_is_json(client: TestClient) -> None:
-    resp = client.post("/api/public/nope", json={})
-    assert resp.status_code in (404, 405)
-    assert resp.headers["content-type"].startswith("application/json")
+@pytest.mark.parametrize("method", ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+@pytest.mark.parametrize("path", ["/api", "/api/public/nope", "/api/customer/x/y",
+                                  "/api/agent/tickets/1/2/3/4"])
+def test_unknown_api_path_is_404_for_every_method(client: TestClient, method: str,
+                                                  path: str) -> None:
+    """Every unknown API path answers the same way, whatever the method (CSRF header sent, as
+    the app always does; without it /api/agent|lead|auth writes are refused first with 403)."""
+    resp = client.request(method, path, headers={"X-Requested-With": "frontdesk"})
+    assert resp.status_code == 404
+    assert set(resp.json()) == {"error", "message", "request_id"}
+    assert resp.json()["error"] == "not_found"
+    assert resp.headers["content-security-policy"] == CSP
+
+
+@pytest.mark.parametrize(("method", "path", "allow"), [
+    ("DELETE", "/api/agent/tickets", "GET, POST"),
+    ("PUT", "/api/public/tickets", "POST"),
+    ("POST", "/api/auth/me", "GET"),
+])
+def test_known_api_path_wrong_method_is_405(client: TestClient, method: str, path: str,
+                                            allow: str) -> None:
+    resp = client.request(method, path, headers={"X-Requested-With": "frontdesk"})
+    assert resp.status_code == 405
+    assert resp.json()["error"] == "method_not_allowed"
+    assert resp.headers["allow"] == allow
+
+
+def test_csv_endpoints_are_declared_text_csv(client: TestClient) -> None:
+    """The OpenAPI contract says what the server really sends (generated frontend types)."""
+    paths = client.get("/openapi.json").json()["paths"]
+    for path in ("/api/agent/tickets/{ticket_id}/transcript.csv", "/api/lead/reports/late.csv"):
+        content = paths[path]["get"]["responses"]["200"]["content"]
+        assert list(content) == ["text/csv"]
 
 
 @pytest.mark.parametrize("path", ["/assets/%2e%2e/%2e%2e/secret.txt", "/%2e%2e/secret.txt",

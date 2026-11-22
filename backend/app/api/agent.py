@@ -15,7 +15,7 @@ from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import distinct_on
 
-from app.api.csv_export import csv_response, ist
+from app.api.csv_export import CSV_ROUTE, csv_response, ist
 from app.db import RequestContext, Tx, load_holidays
 from app.domain import tickets as domain
 from app.models import (
@@ -238,7 +238,7 @@ def get_ticket(request: Request, ticket_id: uuid.UUID, ctx: Tx,
     return ticket_detail(ctx, _load(ctx, ticket_id), agent)
 
 
-@router.get("/tickets/{ticket_id}/transcript.csv")
+@router.get("/tickets/{ticket_id}/transcript.csv", **CSV_ROUTE)
 @limit_agent
 def transcript(request: Request, ticket_id: uuid.UUID, ctx: Tx, agent: CurrentAgent) -> Response:
     """LEAK-1: PUBLIC messages only (messages table), formula-guarded CSV, IST seconds."""

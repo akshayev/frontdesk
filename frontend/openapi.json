@@ -245,10 +245,12 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "CSV attachment (UTF-8, formula-guarded cells).",
             "content": {
-              "application/json": {
-                "schema": {}
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           },
@@ -695,10 +697,12 @@
         "operationId": "late_csv_api_lead_reports_late_csv_get",
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "CSV attachment (UTF-8, formula-guarded cells).",
             "content": {
-              "application/json": {
-                "schema": {}
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           }

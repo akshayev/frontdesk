@@ -22,6 +22,7 @@ from app.security.customer_token import CustomerTicket, generate_token, hash_tok
 from app.security.passwords import hash_password
 from app.security.ratelimit import limiter
 from app.security.sessions import GENERIC_LOGIN_MESSAGE, CurrentLead, email_hmac
+from app.spa import FALLBACK_PATHS
 from tests.integration.conftest import migrated_database
 
 PASSWORD = "correct horse battery staple"
@@ -60,8 +61,8 @@ def _app(auth_db: tuple[Engine, Engine], production: bool = False) -> FastAPI:
     def boom() -> None:
         raise RuntimeError("secret internal detail")
 
-    # The SPA catch-all (app/spa.py) must stay the last route, after these test-only probes.
-    app.router.routes.sort(key=lambda route: getattr(route, "path", "") == "/{path:path}")
+    # The API fallback and SPA catch-all (app/spa.py) must stay last, after these test probes.
+    app.router.routes.sort(key=lambda route: getattr(route, "path", "") in FALLBACK_PATHS)
     return app
 
 

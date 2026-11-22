@@ -13,7 +13,7 @@ from fastapi.responses import Response
 from sqlalchemy import select
 
 from app.api.agent import ticket_detail
-from app.api.csv_export import csv_response, ist
+from app.api.csv_export import CSV_ROUTE, csv_response, ist
 from app.audit.chain import verify
 from app.db import Tx, load_holidays
 from app.domain import holidays as holiday_domain
@@ -78,7 +78,7 @@ def late(request: Request, ctx: Tx, lead: CurrentLead) -> list[LateRowOut]:
     return [_row_out(r) for r in late_report(ctx.session, ctx.now, load_holidays(ctx.session))]
 
 
-@router.get("/reports/late.csv")
+@router.get("/reports/late.csv", **CSV_ROUTE)
 @limit_agent
 def late_csv(request: Request, ctx: Tx, lead: CurrentLead) -> Response:
     """RPT-2: the same report as CSV (built from tickets + events only; formula-guarded)."""

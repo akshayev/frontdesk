@@ -9,10 +9,19 @@ import csv
 import io
 from collections.abc import Iterable, Sequence
 from datetime import datetime
+from typing import Any
 
 from fastapi.responses import Response
 
 from app.sla.calendar import TZ
+
+# Route options for a CSV endpoint: the OpenAPI schema declares text/csv (not JSON), so the
+# generated frontend types match what the server really sends.
+CSV_ROUTE: dict[str, Any] = {
+    "response_class": Response,
+    "responses": {200: {"description": "CSV attachment (UTF-8, formula-guarded cells).",
+                        "content": {"text/csv": {"schema": {"type": "string"}}}}},
+}
 
 _FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
 

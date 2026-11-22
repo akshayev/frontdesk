@@ -129,7 +129,7 @@ Runs in a lifespan asyncio loop every 5 minutes and once at startup; idempotent.
 
 ## 10. API surface
 Auth: `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
-Agent: `GET /api/agent/tickets?view=mine|unassigned|all|late|waiting`, `POST /api/agent/tickets`, `GET /api/agent/tickets/{id}`, `POST …/{id}/claim`, `POST …/{id}/release`, `POST …/{id}/replies` {body, expected_version, wait_for_customer}, `POST …/{id}/notes` {body}, `POST …/{id}/resolve` {expected_version}, `PATCH …/{id}/priority` {priority, expected_version}, `GET …/{id}/transcript.csv` (public messages only)
+Agent: `GET /api/agent/tickets?view=mine|unassigned|all|late|waiting`, `POST /api/agent/tickets`, `GET /api/agent/tickets/{id}`, `POST …/{id}/claim`, `POST …/{id}/release`, `POST …/{id}/replies` {body, expected_version, wait_for_customer}, `POST …/{id}/notes` {body, expected_version}, `POST …/{id}/resolve` {expected_version}, `PATCH …/{id}/priority` {priority, expected_version}, `GET …/{id}/transcript.csv` (public messages only; `text/csv` in the OpenAPI schema, like `late.csv`)
 Lead: `GET /api/lead/agents` ({id, name, role} only, no emails — D-040), `POST /api/lead/tickets/{id}/assign`, `GET /api/lead/reports/late` (+ `.csv`), `GET/POST/DELETE /api/lead/holidays`, `GET /api/lead/audit/verify`
 Customer (header `X-Ticket-Token`): `GET /api/customer/ticket`, `POST /api/customer/ticket/messages`, `POST /api/customer/ticket/reopen`
 Public: `POST /api/public/tickets` (returns secret link once)
@@ -139,7 +139,7 @@ Errors: JSON `{error: code, message, request_id}`; codes include `stale_version`
 
 ## 11. Frontend routes
 `/` (redirect by session), `/login`, `/tickets` (list), `/tickets/:id`, `/reports/late` (lead), `/holidays` (lead), `/new` (public submit), `/t` (customer view; token read from `location.hash` on every load and sent as `X-Ticket-Token`; it stays in the fragment so refresh and bookmarks keep working — D-038 supersedes the earlier `history.replaceState` plan), `*` → not found. Lazy route chunks; guards via `GET /api/auth/me`; architecture in D-037.
-Serving (`app/spa.py`): API routes win; unknown `/api/*` → JSON 404; `/assets/*` → `Cache-Control: public, max-age=31536000, immutable`; any other GET → `index.html` with `no-cache`. The CSP is the same as on every response.
+Serving (`app/spa.py`): API routes win; unknown `/api/*` → JSON 404 for every method (a known API path with the wrong method → 405 + `Allow`); `/assets/*` → `Cache-Control: public, max-age=31536000, immutable`; any other GET → `index.html` with `no-cache`. The CSP is the same as on every response.
 
 ## 12. Deployment
 Dockerfile stage 1 `node:20` builds `frontend/dist`; stage 2 `python:3.12-slim` installs backend with uv, copies dist to `app/static`, runs `alembic upgrade head` (owner URL) then `uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'`. `'*'` is acceptable only because Render's proxy is the sole way to reach the container — to be confirmed in the deploy sprint.
