@@ -1,5 +1,29 @@
 # Frontdesk — completion note
 
-## What I did not finish
+## What I did not finish, and why
 
 - Agent account management — no self sign-up (deliberate: agents are internal staff, and open sign-up would let anyone read tickets and internal notes; in real helpdesks an admin invites agents) and no password reset (a safe reset needs email delivery, which is out of scope; a weaker version would add an attack path). Accounts are created by the seed; next step: a lead-only 'invite agent' screen with an emailed one-time setup link.
+- No email or WhatsApp delivery: a reply is recorded in Frontdesk and read through the customer's private link. Delivery needs provider accounts and templates.
+- No real-time presence indicators: pages poll every 15–30 s instead, because presence needs websockets.
+- No attachments: safe file storage and scanning did not fit the time.
+- No customer accounts: a secret per-ticket link instead, which suits customers arriving from WhatsApp.
+- No browser end-to-end tests: 269 backend tests on real PostgreSQL and 34 frontend unit tests instead; Playwright did not fit the time.
+- Swagger UI is off in production (D-035): it needs third-party scripts the CSP blocks. `/openapi.json` is served.
+- Rate limits are in memory and reset on restart: fine for one instance, not for several.
+- The audit chain is tamper-evident, not tamper-proof: a database superuser could rewrite it. The head hash is not yet published outside the database.
+- Holidays are seeded only with dates I was sure of (25 Dec 2026, 26 Jan 2027). Kerala festival dates change yearly, so the lead must add them.
+- Render auto-deploy is not linked to the repository; deploys are triggered by hand.
+
+## Decisions I made where the story was unclear
+
+- "Fix the same working day" = 9 working hours, so a ticket raised at 18:15 is not due in 15 minutes (D-009).
+- Upgrading priority: new due = the earlier of the old due and now + the new target (D-008).
+- "One working week" of silence = 5 working days; "about one week" to reopen = 7 calendar days (D-010, D-011).
+- Time waiting on the customer is excluded even for tickets that are already late (D-026).
+- A ticket can only be resolved after a public reply (D-027).
+
+## What I verified live
+
+- Live tests on Render found two client-IP problems that local tests could not show: a spoofed `X-Forwarded-For` was trusted (D-045), then the fix picked Render's own proxy (D-046). Both are fixed and re-verified, including from a phone.
+- The production audit log intentionally contains my verification events from 13:13–16:05 IST, including the forged IPs from the spoofing test. The log is insert-only, and those events are the evidence of the fix.
+- Time: 5 h 43 min of logged work on 22 Nov 2026 (09:42–16:21 IST, 6 h 39 min wall clock; docs/TIMELOG.md). I made the decisions with Claude as architect and reviewer; Claude Code generated the code from those specs, and I reviewed every sprint.
