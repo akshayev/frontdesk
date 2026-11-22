@@ -168,6 +168,7 @@ CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the same on every
 - **Manual deploys:** the live service is not linked to the Blueprint and pushes have not triggered deploys, so every env var is set by hand in the Render dashboard and deploys are started by hand (dashboard → Manual Deploy, or `render deploys create <service> --commit <sha>`). Check the live commit matches `git rev-parse --short HEAD`.
 - **Client IP (D-045, D-046):** Render delivers `X-Forwarded-For: <client>, <Cloudflare edge>, <Render internal>`. `TRUSTED_PROXY_HOPS=3` takes the 3rd entry from the right, which a client cannot forge; it feeds the rate limits and the audit log. Locally it is `0` (socket peer, header ignored). Both earlier versions were found wrong by live tests and fixed — see [SECURITY.md §7–8](docs/SECURITY.md).
 - Production: `APP_ENV=production` (HSTS on, `/docs` off), `SWEEP_ENABLED=true` (auto-close sweep every 5 minutes).
+- **Uptime:** an UptimeRobot HTTP(s) monitor checks https://frontdesk-qtlh.onrender.com/healthz every 5 minutes, which also keeps the free instance awake. If it does sleep anyway, the first request may take up to a minute.
 
 ## How it was built
 
