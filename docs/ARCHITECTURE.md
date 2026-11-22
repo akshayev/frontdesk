@@ -66,7 +66,7 @@ Indexes: tickets(status), tickets(assignee_id), tickets(resolution_due_at), mess
 DB-level protection (migration, raw SQL):
 - Trigger `forbid_mutation()` BEFORE UPDATE OR DELETE on `audit_events`, `messages`, `internal_notes` → RAISE EXCEPTION.
 - BEFORE TRUNCATE trigger on the same tables.
-- Role `frontdesk_app`: SELECT/INSERT on those three tables only; SELECT/INSERT/UPDATE on tickets, agents, sessions, customers, holidays (DELETE only on holidays and sessions). Owner role runs migrations. (Neon support for CREATE ROLE to be verified in Sprint 1 — D-015.)
+- Role `frontdesk_app`: SELECT/INSERT on those three tables only; SELECT/INSERT/UPDATE on tickets, agents, sessions, customers, holidays (DELETE only on holidays and sessions). Owner role runs migrations. (Verified on Neon in Sprint 2 — D-015: PostgreSQL 16.16, aws-ap-southeast-1; CREATE ROLE accepted; frontdesk_app has no elevated attributes and is a member of no role; grants and triggers behave as locally. As standard in PG16, the creating role `neondb_owner` holds ADMIN on frontdesk_app — this gives frontdesk_app nothing.)
 
 ## 4. State machine
 | From | Action | Actor | To |
