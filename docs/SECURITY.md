@@ -59,3 +59,12 @@ The CSP is the same on every path. Swagger UI (`/docs`) is served in development
 - [x] pip-audit / npm audit clean — both "No known vulnerabilities" / "found 0 vulnerabilities".
 - [x] No raw SQL built with string formatting — all new SQL is SQLAlchemy constructs or bound parameters.
 - [x] Audit payloads checked for personal data — login events carry actor_id or an HMAC of the email, plus IP; never the typed email (D-031).
+
+### Sprint 3 review (22 Nov 2026)
+- [x] No secrets in diff — `git diff 1c7e9f2 | grep -iE "password|secret|key|token"` reviewed: only identifiers, docstrings and test fixtures. The seed reads SEED_DEMO_PASSWORD from the environment (placeholder in `.env.example`, ≥ 12 chars enforced). Raw customer tokens are returned once in the response and never stored or logged (the sweep logs counts only).
+- [x] Every new endpoint has an auth dependency and a rate-limit group — agent (10 routes): `CurrentAgent` + `limit_agent`; lead (7): `CurrentLead` + `limit_agent`; customer (3): `CustomerTicket` (X-Ticket-Token, 404 otherwise) + `limit_customer`; public (1): no auth by design (IN-1) + `limit_public`. CSRF header enforced by middleware on /api/agent and /api/lead writes.
+- [x] Every new customer-facing schema checked: no note fields — `schemas/customer.py` has public message text, "You"/"Support" + agent first name, status, priority and reopen info only: no notes, no agent ids, no SLA dues, no audit events. A-1 (AST + text) and the I-4 canary test enforce it.
+- [x] Every mutation goes through domain layer (version check + audit event) — all ticket writes are in `app/domain/tickets.py` (row lock → expected_version → §4 transition → permission → version + 1 → audit event, one transaction); claim is the atomic UPDATE (§7). Holidays go through `app/domain/holidays.py` (audited). The seed uses the domain functions and the sweep only.
+- [x] pip-audit / npm audit clean — "No known vulnerabilities found" / "found 0 vulnerabilities".
+- [x] No raw SQL built with string formatting — all new SQL is SQLAlchemy constructs; the only `text()` calls are constant strings (`SELECT now()`) and test fixtures with bound parameters.
+- [x] CSV exports (transcript, late report) prefix cells starting with = + - @ tab CR with `'` (formula injection); tested.

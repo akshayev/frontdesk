@@ -122,7 +122,7 @@ def test_guards(tx: TxFactory, engines) -> None:
     t = _new(tx)
     cases: list[tuple[Callable[[RequestContext], object], str]] = [
         (lambda c: d.agent_reply(c, frozenset(), t.id, a, "x", 0, False), "illegal_transition"),
-        (lambda c: d.resolve(c, frozenset(), t.id, a, 0), "forbidden"),
+        (lambda c: d.resolve(c, frozenset(), t.id, a, 0), "illegal_transition"),
         (lambda c: d.add_note(c, t.id, a, "x", 7), "stale_version"),
         (lambda c: d.claim(c, uuid.uuid4(), a), "not_found"),
     ]

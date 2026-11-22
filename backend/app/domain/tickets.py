@@ -4,8 +4,11 @@ AUD-1, LEAK-3; D-012, D-013, D-020, D-021, D-026, D-027.
 
 Every mutation follows one recipe (ARCHITECTURE §7, CLAUDE.md):
   lock the ticket row (SELECT … FOR UPDATE; 404 if missing) → check expected_version (409
-  stale_version) → check permission (403) and the §4 transition table (409) → apply →
-  version += 1 → append audit event(s) with ctx.now — all inside the caller's transaction.
+  stale_version) → check the §4 transition table (409) and then the actor's permission (403)
+  → apply → version += 1 → append audit event(s) with ctx.now — all inside the caller's
+  transaction. The status is checked before the actor so that an action the table never
+  allows in this status is always 409 (I-8), whoever asks; a wrong actor on an allowed
+  transition is 403 (I-2).
 Claim is the one exception: it is a single atomic UPDATE … WHERE assignee_id IS NULL (§7).
 
 ARCHITECTURE §4 is the only transition table; any other action is 409 illegal_transition.
@@ -304,9 +307,9 @@ def release(ctx: RequestContext, ticket_id: uuid.UUID, agent: Agent,
     """§4 open → release (assignee) → open, unassigned."""
     ticket = lock_ticket(ctx, ticket_id)
     check_version(ticket, expected_version)
-    _require_assignee(ticket, agent, "release it")
     if ticket.status is not S.open:
         raise illegal("Only an open ticket can be released.")
+    _require_assignee(ticket, agent, "release it")
     ticket.assignee_id = None
     _bump(ctx, ticket)
     _event(ctx, ticket, Actor.of_agent(agent), "released")
@@ -349,9 +352,9 @@ def agent_reply(ctx: RequestContext, holidays: Holidays, ticket_id: uuid.UUID, a
     check_version(ticket, expected_version)
     if ticket.status is S.new:
         raise illegal("Claim this ticket before replying.")
-    _require_assignee(ticket, agent, "reply to the customer")
     if ticket.status is not S.open:
         raise illegal(f"Cannot reply to a {ticket.status.value} ticket.")
+    _require_assignee(ticket, agent, "reply to the customer")
     message = _add_message(ctx, ticket, AuthorType.agent, agent.id, body)
     clock = clock_of(ticket)
     if clock.first_response_at is None:
@@ -395,9 +398,9 @@ def resolve(ctx: RequestContext, holidays: Holidays, ticket_id: uuid.UUID, agent
     """
     ticket = lock_ticket(ctx, ticket_id)
     check_version(ticket, expected_version)
-    _require_assignee(ticket, agent, "resolve it")
     if ticket.status is not S.open:
         raise illegal(f"A {ticket.status.value} ticket cannot be resolved.")
+    _require_assignee(ticket, agent, "resolve it")
     if ticket.first_response_at is None:
         raise DomainError("reply_required", 409,
                           "Reply to the customer before resolving this ticket.")
@@ -419,10 +422,10 @@ def change_priority(ctx: RequestContext, holidays: Holidays, ticket_id: uuid.UUI
     policy.change_priority; PRI-5: priority_changed records old/new priority and due times."""
     ticket = lock_ticket(ctx, ticket_id)
     check_version(ticket, expected_version)
-    if ticket.assignee_id != agent.id and agent.role is not AgentRole.lead:
-        raise forbidden("Only the ticket's owner or the lead can change its priority.")
     if ticket.status not in (S.new, S.open, S.waiting_on_customer):
         raise illegal(f"Priority cannot change on a {ticket.status.value} ticket.")
+    if ticket.assignee_id != agent.id and agent.role is not AgentRole.lead:
+        raise forbidden("Only the ticket's owner or the lead can change its priority.")
     if new_priority == ticket.priority:
         raise validation(f"The ticket is already {new_priority.value}.")
     old = clock_of(ticket)
